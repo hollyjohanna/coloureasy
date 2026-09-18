@@ -73,7 +73,7 @@ export default function PalettePanel({
         </p>
       </div>
 
-      <ul className="flex-1 space-y-1.5 overflow-y-auto px-3 py-3">
+      <ul className="space-y-1.5 px-3 py-3 lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
         {swatches.map((swatch) => (
           <SwatchRow
             key={swatch.id}

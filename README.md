@@ -1,7 +1,15 @@
 # Colour Extractor
 
-Drop in an image and pull out its palette. Choose how many colours, see where on
-the image each one came from, and click the image to add your own.
+Two tools over one image, for abstracting a reference photo down to a set of
+colours you can mix and paint.
+
+**Colour Picker** — drop in an image and pull out its palette. Choose how many
+colours, see where on the image each one came from, and click the image to add
+your own.
+
+**Layer Extractor** — rebuild that image using *only* those colours, so whole
+areas flatten to one tone you can mix a pot of paint for. Split the result into
+one layer per colour and export them as PNGs, plus a printable reference sheet.
 
 Everything runs in the browser. Images are never uploaded and nothing is stored.
 
@@ -65,6 +73,25 @@ stored as percentages so the overlay stays aligned at any display size.
 stray JPEG artefact can't become your brand colour. Hand-picked colours are kept
 separate from the extracted ones, so moving the slider never disturbs them.
 
+**Posterising** (`src/lib/posterise.ts`) maps every pixel to the nearest palette
+colour in OKLab, then cleans the result up — a 3×3 mode filter to kill speckle,
+then a flood fill that absorbs any region too small to paint into whatever
+borders it most. Those two passes are what separate "posterised" from
+"paintable": a raw nearest-colour mapping of a photo is confetti along every
+edge, and you can't mix a colour for a pixel. The **Detail** control trades fine
+detail against flatter, bolder areas.
+
+Everything downstream reads the resulting *label map* — one byte per pixel — so
+the preview, each layer and the export never re-read the original image. Runs in
+a worker at up to 2400px, debounced so dragging the colour slider doesn't queue
+up work.
+
+**Layers** come out either *isolated* (one colour each, transparent elsewhere,
+stackable in any order) or *cumulative* (each one a full coat over the last,
+stacked in order). Both are the same label map composited differently. They're
+bundled with `src/lib/zip.ts`, a ~120-line store-only ZIP writer — the PNGs are
+already compressed, so deflating again would only cost a 100KB dependency.
+
 **Pasted URLs** are loaded directly where the host sends CORS headers. When it
 doesn't, the canvas would be tainted and the pixels unreadable, so the bytes come
 back through `api/fetch-image.ts` instead. That function is deliberately narrow:
@@ -86,5 +113,6 @@ config. There are no environment variables to set.
 npm test
 ```
 
-Covers colour-space round trips, quantiser determinism and slider stability, and
-the proxy's SSRF guards. The proxy tests never touch the network.
+Covers colour-space round trips, quantiser determinism and slider stability, the
+posterise passes, the ZIP writer, and the proxy's SSRF guards. The proxy tests
+never touch the network.

@@ -5,7 +5,7 @@
 import { formatAll, readableTextOn, rgbToHex } from './colour';
 import type { Swatch } from './palette';
 
-function download(blob: Blob, filename: string) {
+export function download(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
@@ -16,10 +16,16 @@ function download(blob: Blob, filename: string) {
   URL.revokeObjectURL(url);
 }
 
-/** `photo.jpg` -> `photo-palette` */
-function baseName(imageName: string) {
+/**
+ * `photo.jpg` -> `photo-palette`.
+ *
+ * Non-ASCII is stripped rather than preserved: these names end up inside ZIP
+ * archives, and older unzip builds still mangle UTF-8 filenames badly enough to
+ * fail the extraction.
+ */
+export function baseName(imageName: string, suffix = 'palette') {
   const stem = imageName.replace(/\.[^./]+$/, '').replace(/[^a-z0-9-_]+/gi, '-');
-  return `${stem || 'palette'}-palette`;
+  return `${stem || suffix}-${suffix}`;
 }
 
 /* -------------------------------------------------------------------- PNG */
@@ -56,6 +62,12 @@ export async function exportPng(swatches: Swatch[], imageName: string) {
 
     ctx.fillStyle = hex;
     ctx.fillRect(x, y, SWATCH, SWATCH);
+
+    // Outline every swatch: white and near-white ones are otherwise invisible
+    // against the sheet.
+    ctx.strokeStyle = '#d9d9d9';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x + 0.5, y + 0.5, SWATCH - 1, SWATCH - 1);
 
     // Hex inside the swatch, in whichever of black/white stays readable on it.
     ctx.fillStyle = readableTextOn(swatch.rgb);

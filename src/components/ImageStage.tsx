@@ -36,7 +36,7 @@ export default function ImageStage({
   };
 
   return (
-    <div className="flex min-h-0 flex-1 items-center justify-center p-4 sm:p-8">
+    <div className="flex shrink-0 items-center justify-center p-4 sm:p-8 lg:min-h-0 lg:flex-1 lg:shrink">
       {/* inline-block so the frame shrink-wraps the image exactly: marker
           percentages then land on real image pixels at any display size. */}
       <div
@@ -50,7 +50,7 @@ export default function ImageStage({
           src={image.src}
           alt={image.name}
           draggable={false}
-          className="block max-h-[70vh] w-auto max-w-full select-none lg:max-h-[80vh]"
+          className="block max-h-[52vh] w-auto max-w-full select-none lg:max-h-[80vh]"
         />
 
         {swatches.map((swatch) => (
