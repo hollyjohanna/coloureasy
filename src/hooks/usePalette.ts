@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Rgb } from '../lib/colour';
 import {
   ImageLoadError,
+  loadFromBlob,
   loadFromFile,
   loadFromUrl,
   releaseImage,
@@ -130,6 +131,10 @@ export function usePalette() {
 
   const openFile = useCallback((file: File) => accept(() => loadFromFile(file)), [accept]);
   const openUrl = useCallback((url: string) => accept(() => loadFromUrl(url)), [accept]);
+  const openBlob = useCallback(
+    (blob: Blob, name: string) => accept(() => loadFromBlob(blob, name)),
+    [accept],
+  );
 
   const extracted = useMemo<Swatch[]>(() => {
     if (!tree) return [];
@@ -223,6 +228,7 @@ export function usePalette() {
     derive,
     openFile,
     openUrl,
+    openBlob,
     addAt,
     removeManual,
     peekAt,

@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import DropZone from './components/DropZone';
 import ImageStage from './components/ImageStage';
+import Library from './components/Library';
 import LayerExtractor from './components/LayerExtractor';
 import LayerList from './components/LayerList';
 import PalettePanel from './components/PalettePanel';
@@ -8,6 +9,7 @@ import PalettePicker from './components/PalettePicker';
 import SharedPalette from './components/SharedPalette';
 import Sidebar, { type Tool } from './components/Sidebar';
 import ValuePanel from './components/ValuePanel';
+import { useLibrary } from './hooks/useLibrary';
 import { usePalette } from './hooks/usePalette';
 import { usePicks } from './hooks/usePicks';
 import { usePosterise } from './hooks/usePosterise';
@@ -19,6 +21,10 @@ import { paletteFromLocation, shareUrlFor } from './lib/shareUrl';
 
 export default function App() {
   const palette = usePalette();
+  const library = useLibrary();
+  // Lands on a work tool, which with no image loaded shows the drop zone.
+  // Opening on the Library instead would greet a first-time visitor with an
+  // empty grid and every other tool greyed out.
   const [tool, setTool] = useState<Tool>('palette');
   const [hovered, setHovered] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -54,6 +60,76 @@ export default function App() {
     const timer = setTimeout(() => setToast(null), 2200);
     return () => clearTimeout(timer);
   }, [toast]);
+
+  /* ----------------------------------------------------------- library --- */
+
+  const [recordId, setRecordId] = useState<string | null>(null);
+  // Set just before opening a library image, so the save effect below knows
+  // this one is already stored and doesn't file a duplicate.
+  const reopening = useRef<string | null>(null);
+  const described = useRef(new Set<string>());
+  // Where to return to after picking something in the Library.
+  const lastWorkTool = useRef<Tool>('palette');
+
+  useEffect(() => {
+    if (tool !== 'library') lastWorkTool.current = tool;
+  }, [tool]);
+
+  // Every image that gets opened is remembered, which is what makes Recent a
+  // recent list. Filing into a collection stays deliberate.
+  useEffect(() => {
+    const image = palette.image;
+    if (!image) {
+      setRecordId(null);
+      return;
+    }
+
+    if (reopening.current) {
+      setRecordId(reopening.current);
+      reopening.current = null;
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const blob = await fetch(image.src).then((r) => r.blob());
+        if (cancelled) return;
+        const id = await library.remember(blob, image.name, []);
+        if (!cancelled) setRecordId(id);
+      } catch {
+        /* the library is a convenience; never block the tools on it */
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    // library.remember is stable enough; re-running per image is the intent.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [palette.image]);
+
+  // Once extraction finishes, attach a few colours for the library grid.
+  useEffect(() => {
+    if (!recordId || palette.swatches.length === 0) return;
+    if (described.current.has(recordId)) return;
+    described.current.add(recordId);
+    library.describe(
+      recordId,
+      palette.derive(6).map((s) => s.rgb),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recordId, palette.swatches.length]);
+
+  const openFromLibrary = useCallback(
+    (record: { id: string; blob: Blob; name: string }) => {
+      reopening.current = record.id;
+      library.open(record.id);
+      palette.openBlob(record.blob, record.name);
+      setTool(lastWorkTool.current);
+    },
+    [library, palette],
+  );
 
   const busy = palette.status === 'loading' || palette.status === 'extracting';
   const error = palette.error ?? posterise.error ?? values.error;
@@ -143,14 +219,48 @@ export default function App() {
         )}
       </header>
 
-      {palette.image ? (
-        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto lg:flex-row lg:overflow-hidden">
-          {/* Narrow screens scroll this whole column; from lg up the panes are
-              fixed height and scroll their own contents. Without the mobile
-              scroll the image overflows and covers the tool tabs. */}
-          <Sidebar tool={tool} onChange={setTool} />
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto lg:flex-row lg:overflow-hidden">
+        {/* Narrow screens scroll this whole column; from lg up the panes are
+            fixed height and scroll their own contents. Without the mobile
+            scroll the image overflows and covers the tool tabs. */}
+        <Sidebar tool={tool} onChange={setTool} hasImage={Boolean(palette.image)} />
 
-          <main className="flex min-w-0 flex-col lg:min-h-0 lg:flex-1 lg:flex-row">
+        <main className="flex min-w-0 flex-col lg:min-h-0 lg:flex-1 lg:flex-row">
+          {tool === 'library' && (
+            <Library
+              images={library.images}
+              collections={library.collections}
+              space={library.space}
+              ready={library.ready}
+              available={library.available}
+              onOpen={openFromLibrary}
+              onRemove={library.remove}
+              onAddCollection={library.addCollection}
+              onRenameCollection={library.renameCollection}
+              onDropCollection={library.dropCollection}
+              onToggleIn={library.toggleIn}
+              onAddImage={() => setTool(lastWorkTool.current)}
+            />
+          )}
+
+          {tool !== 'library' && !palette.image && (
+            <div className="flex flex-1 flex-col items-center justify-center gap-10 py-10">
+              <DropZone onFile={palette.openFile} onUrl={palette.openUrl} busy={busy} />
+              {shared.length > 0 && (
+                <SharedPalette
+                  colours={shared}
+                  onDismiss={() => {
+                    setShared([]);
+                    history.replaceState(null, '', window.location.pathname);
+                  }}
+                  notify={notify}
+                />
+              )}
+            </div>
+          )}
+
+          {palette.image && (
+            <>
             {tool === 'palette' && (
               <PalettePicker
                 image={palette.image}
@@ -264,23 +374,10 @@ export default function App() {
                 />
               </>
             )}
-          </main>
-        </div>
-      ) : (
-        <main className="flex min-h-0 flex-1 flex-col items-center justify-center gap-10 py-10">
-          <DropZone onFile={palette.openFile} onUrl={palette.openUrl} busy={busy} />
-          {shared.length > 0 && (
-            <SharedPalette
-              colours={shared}
-              onDismiss={() => {
-                setShared([]);
-                history.replaceState(null, '', window.location.pathname);
-              }}
-              notify={notify}
-            />
+            </>
           )}
         </main>
-      )}
+      </div>
 
       {busy && (
         <div className="pointer-events-none fixed inset-x-0 top-0 h-0.5 overflow-hidden bg-line">

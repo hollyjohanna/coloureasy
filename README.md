@@ -1,7 +1,11 @@
 # Colour Extractor
 
-Four tools over one image, for abstracting a reference photo down to something
-you can mix and paint.
+A painting-planning tool: keep your reference images, and break each one down
+into something you can mix and paint.
+
+**Library** — every image you open is kept automatically, and you can file them
+into collections. Stored in the browser, so it belongs to one device and nothing
+is uploaded.
 
 **Palette** — five colours pulled straight from the image, up to eight, shown
 side by side. Drag any marker around the image to re-pick that colour.
@@ -17,7 +21,8 @@ however well the colours are mixed.
 areas flatten to one tone you can mix a pot of paint for. Split the result into
 one layer per colour and export them as PNGs, plus a printable reference sheet.
 
-Everything runs in the browser. Images are never uploaded and nothing is stored.
+Everything runs in the browser. Images are never uploaded; the library lives in
+your own browser storage and never reaches a server.
 
 ## Stack
 
@@ -106,6 +111,19 @@ stacked in order). Both are the same label map composited differently. They're
 bundled with `src/lib/zip.ts`, a ~120-line store-only ZIP writer — the PNGs are
 already compressed, so deflating again would only cost a 100KB dependency.
 
+**The library** (`src/lib/library.ts`) is IndexedDB, which holds Blobs — so the
+images themselves live beside their metadata and nothing needs a server. The
+shapes are deliberately the ones a Postgres schema would use (images,
+collections, a list of members), so adding sync later would be additive rather
+than a rewrite.
+
+Images are stored at up to 2400px, which is what the posteriser works at, so
+keeping originals would cost quota for detail nothing ever reads. Recents age
+out past 60 — but anything filed into a collection is never pruned, because
+silently deleting something the user deliberately kept would be the worst
+possible behaviour. The app asks for `navigator.storage.persist()` on first load
+so a library built up over months isn't cleared the first time the disk fills.
+
 **Pasted URLs** are loaded directly where the host sends CORS headers. When it
 doesn't, the canvas would be tainted and the pixels unreadable, so the bytes come
 back through `api/fetch-image.ts` instead. That function is deliberately narrow:
@@ -128,5 +146,6 @@ npm test
 ```
 
 Covers colour-space round trips, quantiser determinism and slider stability, the
-posterise passes, the ZIP writer, and the proxy's SSRF guards. The proxy tests
+posterise passes, the value-study range, the ZIP writer, the library's pruning
+rule, and the proxy's SSRF guards. The proxy tests
 never touch the network.

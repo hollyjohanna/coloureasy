@@ -55,6 +55,11 @@ export function loadFromFile(file: File): Promise<LoadedImage> {
   return fromBlob(file, file.name, false);
 }
 
+/** Open an image already held locally, such as one from the library. */
+export function loadFromBlob(blob: Blob, name: string): Promise<LoadedImage> {
+  return fromBlob(blob, name, false);
+}
+
 function filenameFromUrl(url: string): string {
   try {
     const { pathname, hostname } = new URL(url);
