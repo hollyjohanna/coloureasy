@@ -1,4 +1,11 @@
-import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+  type RefObject,
+} from 'react';
 
 export const MIN_ZOOM = 0.5;
 export const MAX_ZOOM = 8;
@@ -81,6 +88,11 @@ export default function Stage({
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const frame = useRef<HTMLDivElement | null>(null);
 
+  // The point of the image currently in the middle of the pane. Zooming keeps
+  // this fixed, so the view grows around whatever you are looking at rather
+  // than creeping towards the top-left corner.
+  const anchor = useRef({ x: 0.5, y: 0.5 });
+
   const attachFrame = (el: HTMLDivElement | null) => {
     frame.current = el;
     if (frameRef) frameRef.current = el;
@@ -123,6 +135,39 @@ export default function Stage({
 
   const w = Math.round(fitted.w * zoom);
   const h = Math.round(fitted.h * zoom);
+
+  /** Remember what is centred, so a later resize can put it back. */
+  const captureAnchor = () => {
+    const pane = paneRef.current;
+    const fr = frame.current;
+    if (!pane || !fr) return;
+
+    const p = pane.getBoundingClientRect();
+    const f = fr.getBoundingClientRect();
+    if (f.width === 0 || f.height === 0) return;
+
+    anchor.current = {
+      x: Math.min(1, Math.max(0, (p.left + p.width / 2 - f.left) / f.width)),
+      y: Math.min(1, Math.max(0, (p.top + p.height / 2 - f.top) / f.height)),
+    };
+  };
+
+  // Runs after the frame has been laid out at its new size but before paint,
+  // so the correction is never visible as a jump.
+  useLayoutEffect(() => {
+    const pane = paneRef.current;
+    const fr = frame.current;
+    if (!pane || !fr || w === 0 || h === 0) return;
+
+    const p = pane.getBoundingClientRect();
+    const f = fr.getBoundingClientRect();
+
+    // Scroll by however far the anchor has drifted from the middle. Measuring
+    // rather than calculating means centring margins and insets are already
+    // accounted for, and the browser clamps the result at the edges.
+    pane.scrollLeft += f.left + anchor.current.x * f.width - (p.left + p.width / 2);
+    pane.scrollTop += f.top + anchor.current.y * f.height - (p.top + p.height / 2);
+  }, [w, h]);
 
   const overflows = () => {
     const pane = paneRef.current;
@@ -232,7 +277,8 @@ export default function Stage({
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
-        className={`min-h-[52vh] overflow-auto lg:min-h-0 lg:flex-1 ${
+        onScroll={captureAnchor}
+        className={`flex min-h-[52vh] overflow-auto lg:min-h-0 lg:flex-1 ${
           panning ? 'cursor-grabbing select-none' : ''
         }`}
       >
@@ -248,7 +294,10 @@ export default function Stage({
             onFrameClick?.(event);
           }}
           style={{ width: w || undefined, height: h || undefined }}
-          className={`checkerboard relative m-auto overflow-hidden rounded-xl shadow-2xl ${frameClassName}`}
+          // A flex parent plus `m-auto` centres on both axes and still scrolls
+          // to every edge when zoomed; `justify-center` would clip the overflow
+          // at the top and left instead.
+          className={`checkerboard relative m-auto shrink-0 overflow-hidden rounded-xl shadow-2xl ${frameClassName}`}
         >
           {children}
         </div>
