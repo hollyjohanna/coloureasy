@@ -35,6 +35,9 @@ export default function App() {
   const [compare, setCompare] = useState(false);
   const [mode, setMode] = useState<LayerMode>('isolated');
   const [exporting, setExporting] = useState<string | null>(null);
+  // Shared across tools, so zooming in to pick a colour and then switching to
+  // the value study keeps you looking at the same part of the picture.
+  const [zoom, setZoom] = useState(1);
 
   const colours = useMemo(() => palette.swatches.map((s) => s.rgb), [palette.swatches]);
 
@@ -77,6 +80,12 @@ export default function App() {
   useEffect(() => {
     if (tool !== 'library') lastWorkTool.current = tool;
   }, [tool]);
+
+  // A new picture starts fitted; inheriting 500% from the last one would open
+  // on a corner of it with no indication why.
+  useEffect(() => {
+    setZoom(1);
+  }, [palette.image]);
 
   // Every image that gets opened is remembered, which is what makes Recent a
   // recent list. Filing into a collection stays deliberate.
@@ -290,6 +299,8 @@ export default function App() {
                 onReset={picks.reset}
                 edited={picks.edited}
                 onCopy={copy}
+                zoom={zoom}
+                onZoom={setZoom}
                 onExportPng={() =>
                   exportStrip(
                     picks.picks.map((p) => p.rgb),
@@ -311,6 +322,10 @@ export default function App() {
                   working={values.working}
                   compareSrc={palette.image.src}
                   compare={compare}
+                  width={palette.image.width}
+                  height={palette.image.height}
+                  zoom={zoom}
+                  onZoom={setZoom}
                 />
                 <ValuePanel
                   layers={values.layers}
@@ -354,7 +369,10 @@ export default function App() {
                       );
                     }
                   }}
+                  onRemove={palette.removeManual}
                   canPick={palette.canPick}
+                  zoom={zoom}
+                  onZoom={setZoom}
                 />
                 <PalettePanel
                   swatches={palette.swatches}
@@ -379,6 +397,10 @@ export default function App() {
                   working={posterise.working}
                   compareSrc={palette.image.src}
                   compare={compare}
+                  width={palette.image.width}
+                  height={palette.image.height}
+                  zoom={zoom}
+                  onZoom={setZoom}
                 />
                 <LayerList
                   layers={posterise.layers}

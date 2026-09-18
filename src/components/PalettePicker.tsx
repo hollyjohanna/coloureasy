@@ -6,6 +6,7 @@ import {
 } from '../hooks/usePicks';
 import { formatAll, readableTextOn, rgbToHex } from '../lib/colour';
 import type { LoadedImage } from '../lib/loadImage';
+import Stage from './Stage';
 
 type Props = {
   image: LoadedImage;
@@ -20,6 +21,8 @@ type Props = {
   onCopy: (label: string, value: string) => void;
   onExportPng: () => void;
   onShare: () => void;
+  zoom: number;
+  onZoom: (zoom: number) => void;
 };
 
 export default function PalettePicker({
@@ -35,6 +38,8 @@ export default function PalettePicker({
   onCopy,
   onExportPng,
   onShare,
+  zoom,
+  onZoom,
 }: Props) {
   const frameRef = useRef<HTMLDivElement>(null);
 
@@ -141,44 +146,45 @@ export default function PalettePicker({
         </div>
       </div>
 
-      <div className="flex shrink-0 items-center justify-center p-4 sm:p-6 lg:min-h-0 lg:flex-1 lg:shrink">
-        <div
-          ref={frameRef}
-          className="checkerboard relative inline-block overflow-hidden rounded-xl shadow-2xl"
-        >
-          <img
-            src={image.src}
-            alt={image.name}
-            draggable={false}
-            className="block max-h-[42vh] w-auto max-w-full select-none lg:max-h-[62vh]"
-          />
+      <Stage
+        width={image.width}
+        height={image.height}
+        zoom={zoom}
+        onZoom={onZoom}
+        frameRef={frameRef}
+      >
+        <img
+          src={image.src}
+          alt={image.name}
+          draggable={false}
+          className="block h-full w-full select-none"
+        />
 
-          {picks.map((pick, i) => (
-            <button
-              key={pick.id}
-              type="button"
-              aria-label={`Colour ${i + 1}, ${rgbToHex(pick.rgb).toUpperCase()}. Drag or use arrow keys to move.`}
-              onPointerDown={startDrag(pick.id)}
-              onPointerMove={drag(pick.id)}
-              onPointerUp={endDrag}
-              onPointerCancel={endDrag}
-              onKeyDown={nudge(pick)}
-              className={`absolute grid h-8 w-8 touch-none place-items-center rounded-full border-[3px] border-white font-mono text-[11px] font-semibold shadow-[0_0_0_1px_rgba(0,0,0,0.5)] transition-transform ${
-                dragging === pick.id ? 'scale-125 cursor-grabbing' : 'cursor-grab hover:scale-110'
-              }`}
-              style={{
-                left: `${pick.x * 100}%`,
-                top: `${pick.y * 100}%`,
-                transform: 'translate(-50%, -50%)',
-                background: rgbToHex(pick.rgb),
-                color: readableTextOn(pick.rgb),
-              }}
-            >
-              {i + 1}
-            </button>
-          ))}
-        </div>
-      </div>
+        {picks.map((pick, i) => (
+          <button
+            key={pick.id}
+            type="button"
+            aria-label={`Colour ${i + 1}, ${rgbToHex(pick.rgb).toUpperCase()}. Drag or use arrow keys to move.`}
+            onPointerDown={startDrag(pick.id)}
+            onPointerMove={drag(pick.id)}
+            onPointerUp={endDrag}
+            onPointerCancel={endDrag}
+            onKeyDown={nudge(pick)}
+            className={`absolute grid h-8 w-8 touch-none place-items-center rounded-full border-[3px] border-white font-mono text-[11px] font-semibold shadow-[0_0_0_1px_rgba(0,0,0,0.5)] transition-transform ${
+              dragging === pick.id ? 'scale-125 cursor-grabbing' : 'cursor-grab hover:scale-110'
+            }`}
+            style={{
+              left: `${pick.x * 100}%`,
+              top: `${pick.y * 100}%`,
+              transform: 'translate(-50%, -50%)',
+              background: rgbToHex(pick.rgb),
+              color: readableTextOn(pick.rgb),
+            }}
+          >
+            {i + 1}
+          </button>
+        ))}
+      </Stage>
 
       {/* The palette itself. Vertical bars side by side from sm up; stacked
           rows on a phone, where eight bars would be too narrow to read. */}
