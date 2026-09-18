@@ -4,17 +4,22 @@ import ImageStage from './components/ImageStage';
 import LayerExtractor from './components/LayerExtractor';
 import LayerList from './components/LayerList';
 import PalettePanel from './components/PalettePanel';
+import PalettePicker from './components/PalettePicker';
 import SharedPalette from './components/SharedPalette';
 import Sidebar, { type Tool } from './components/Sidebar';
+import ValuePanel from './components/ValuePanel';
 import { usePalette } from './hooks/usePalette';
+import { usePicks } from './hooks/usePicks';
 import { usePosterise } from './hooks/usePosterise';
+import { useValueStudy } from './hooks/useValueStudy';
 import type { Rgb } from './lib/colour';
+import { exportStrip } from './lib/export';
 import { exportLayerZip, exportReferenceSheet, type LayerMode } from './lib/exportLayers';
-import { paletteFromLocation } from './lib/shareUrl';
+import { paletteFromLocation, shareUrlFor } from './lib/shareUrl';
 
 export default function App() {
   const palette = usePalette();
-  const [tool, setTool] = useState<Tool>('picker');
+  const [tool, setTool] = useState<Tool>('palette');
   const [hovered, setHovered] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [shared, setShared] = useState<Rgb[]>(() => paletteFromLocation());
@@ -24,11 +29,25 @@ export default function App() {
 
   const colours = useMemo(() => palette.swatches.map((s) => s.rgb), [palette.swatches]);
 
-  // Only runs while the Layer Extractor is open — no point posterising a
-  // full-resolution image nobody is looking at.
+  // Each heavy tool only runs while it's the one on screen — no point
+  // posterising a full-resolution image nobody is looking at.
   const posterise = usePosterise(palette.image, palette.swatches, tool === 'layers');
+  const values = useValueStudy(palette.image, tool === 'values');
+  const picks = usePicks(palette.derive, palette.peekAt, palette.image);
 
   const notify = useCallback((message: string) => setToast(message), []);
+
+  const copy = useCallback(
+    async (label: string, value: string) => {
+      try {
+        await navigator.clipboard.writeText(value);
+        notify(`${label} copied — ${value}`);
+      } catch {
+        notify('Your browser blocked the clipboard.');
+      }
+    },
+    [notify],
+  );
 
   useEffect(() => {
     if (!toast) return;
@@ -37,17 +56,24 @@ export default function App() {
   }, [toast]);
 
   const busy = palette.status === 'loading' || palette.status === 'extracting';
-  const error = palette.error ?? posterise.error;
+  const error = palette.error ?? posterise.error ?? values.error;
 
-  const exportZip = async () => {
-    if (!posterise.result || !palette.image) return;
+  // Both the Layer Extractor and the Value Study produce the same shape of
+  // result, so one export path serves them.
+  const exportZipFor = async (
+    result: typeof posterise.result,
+    layers: typeof posterise.layers,
+    swatchColours: Rgb[],
+    suffix: string,
+  ) => {
+    if (!result || !palette.image) return;
     setExporting('Building…');
     try {
       await exportLayerZip(
-        posterise.result,
-        posterise.layers,
-        colours,
-        palette.image.name,
+        result,
+        layers,
+        swatchColours,
+        `${palette.image.name} ${suffix}`.trim(),
         mode,
         (done, total) => setExporting(`${done}/${total}`),
       );
@@ -58,6 +84,9 @@ export default function App() {
       setExporting(null);
     }
   };
+
+  const exportZip = () =>
+    exportZipFor(posterise.result, posterise.layers, colours, '');
 
   const exportSheet = async () => {
     if (!posterise.result || !palette.image) return;
@@ -71,6 +100,22 @@ export default function App() {
       notify('Reference sheet exported.');
     } catch {
       notify('Could not build the reference sheet.');
+    }
+  };
+
+  const exportValuePng = async () => {
+    if (!values.result || !palette.image) return;
+    try {
+      await exportReferenceSheet(
+        values.result,
+        values.layers,
+        values.palette,
+        palette.image.name,
+        'values',
+      );
+      notify('Value study exported.');
+    } catch {
+      notify('Could not build the value study.');
     }
   };
 
@@ -105,8 +150,67 @@ export default function App() {
               scroll the image overflows and covers the tool tabs. */}
           <Sidebar tool={tool} onChange={setTool} />
 
-          <main className="flex flex-col lg:min-h-0 lg:flex-1 lg:flex-row">
-            {tool === 'picker' ? (
+          <main className="flex min-w-0 flex-col lg:min-h-0 lg:flex-1 lg:flex-row">
+            {tool === 'palette' && (
+              <PalettePicker
+                image={palette.image}
+                picks={picks.picks}
+                count={picks.count}
+                onCount={picks.setCount}
+                onMove={picks.moveTo}
+                dragging={picks.dragging}
+                setDragging={picks.setDragging}
+                onReset={picks.reset}
+                edited={picks.edited}
+                onCopy={copy}
+                onExportPng={() =>
+                  exportStrip(
+                    picks.picks.map((p) => p.rgb),
+                    palette.image!.name,
+                  )
+                }
+                onShare={() =>
+                  copy('Share link', shareUrlFor(picks.picks.map((p) => p.rgb)))
+                }
+              />
+            )}
+
+            {tool === 'values' && (
+              <>
+                <LayerExtractor
+                  result={values.result}
+                  palette={values.palette}
+                  visible={values.visible}
+                  working={values.working}
+                  compareSrc={palette.image.src}
+                  compare={compare}
+                />
+                <ValuePanel
+                  layers={values.layers}
+                  steps={values.steps}
+                  onSteps={values.setSteps}
+                  detail={values.detail}
+                  onDetail={values.setDetail}
+                  hidden={values.hidden}
+                  allVisible={values.allVisible}
+                  onToggle={values.toggle}
+                  onSolo={values.solo}
+                  onShowAll={values.showAll}
+                  compare={compare}
+                  onCompare={setCompare}
+                  mode={mode}
+                  onMode={setMode}
+                  onExportPng={exportValuePng}
+                  onExportZip={() =>
+                    exportZipFor(values.result, values.layers, values.palette, 'values')
+                  }
+                  busy={values.working || exporting !== null}
+                  exporting={exporting}
+                />
+              </>
+            )}
+
+            {tool === 'picker' && (
               <>
                 <ImageStage
                   image={palette.image}
@@ -128,7 +232,9 @@ export default function App() {
                   notify={notify}
                 />
               </>
-            ) : (
+            )}
+
+            {tool === 'layers' && (
               <>
                 <LayerExtractor
                   result={posterise.result}

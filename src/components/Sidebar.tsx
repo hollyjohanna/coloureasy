@@ -1,16 +1,38 @@
-export type Tool = 'picker' | 'layers';
+export type Tool = 'palette' | 'picker' | 'values' | 'layers';
 
-const TOOLS: { id: Tool; label: string; hint: string; icon: string }[] = [
+const TOOLS: {
+  id: Tool;
+  label: string;
+  short: string;
+  hint: string;
+  icon: string;
+}[] = [
+  {
+    id: 'palette',
+    label: 'Palette',
+    short: 'Palette',
+    hint: 'Five colours, drag to re-pick',
+    icon: '▦',
+  },
   {
     id: 'picker',
     label: 'Colour Picker',
-    hint: 'Pull a palette out of the image',
+    short: 'Picker',
+    hint: 'Every colour, with codes',
     icon: '◎',
+  },
+  {
+    id: 'values',
+    label: 'Value Study',
+    short: 'Values',
+    hint: 'Tone alone, colour removed',
+    icon: '◐',
   },
   {
     id: 'layers',
     label: 'Layer Extractor',
-    hint: 'Rebuild the image from that palette',
+    short: 'Layers',
+    hint: 'Rebuild it from the palette',
     icon: '◧',
   },
 ];
@@ -40,15 +62,21 @@ export default function Sidebar({ tool, onChange, disabled }: Props) {
             disabled={disabled}
             aria-current={active ? 'page' : undefined}
             onClick={() => onChange(item.id)}
-            className={`flex flex-1 items-center gap-2.5 rounded-lg px-3 py-2 text-left transition-colors disabled:opacity-40 lg:flex-none ${
+            className={`flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-2 transition-colors disabled:opacity-40 lg:flex-none lg:justify-start lg:gap-2.5 lg:px-3 ${
               active ? 'bg-raised text-ink' : 'text-muted hover:bg-surface hover:text-ink'
             }`}
           >
             <span aria-hidden className="text-base leading-none">
               {item.icon}
             </span>
-            <span className="min-w-0">
-              <span className="block truncate text-sm font-medium">{item.label}</span>
+            <span className="min-w-0 text-left">
+              {/* Four tabs across a phone: short names below lg, full above. */}
+              <span className="block truncate text-xs font-medium lg:hidden">
+                {item.short}
+              </span>
+              <span className="hidden truncate text-sm font-medium lg:block">
+                {item.label}
+              </span>
               <span className="hidden truncate text-xs text-faint lg:block">
                 {item.hint}
               </span>

@@ -1,11 +1,17 @@
 # Colour Extractor
 
-Two tools over one image, for abstracting a reference photo down to a set of
-colours you can mix and paint.
+Four tools over one image, for abstracting a reference photo down to something
+you can mix and paint.
 
-**Colour Picker** — drop in an image and pull out its palette. Choose how many
-colours, see where on the image each one came from, and click the image to add
-your own.
+**Palette** — five colours pulled straight from the image, up to eight, shown
+side by side. Drag any marker around the image to re-pick that colour.
+
+**Colour Picker** — the full palette, up to 64 colours, with HEX/RGB/HSL/HSB/CMYK
+for each and a marker showing where it came from. Click the image to add your own.
+
+**Value Study** — the same image in three or four tones, colour removed. The
+study you do before touching paint: if the values are wrong the painting fails
+however well the colours are mixed.
 
 **Layer Extractor** — rebuild that image using *only* those colours, so whole
 areas flatten to one tone you can mix a pot of paint for. Split the result into
@@ -72,6 +78,14 @@ stored as percentages so the overlay stays aligned at any display size.
 **Clicking the image** averages a 5×5 neighbourhood rather than one pixel, so a
 stray JPEG artefact can't become your brand colour. Hand-picked colours are kept
 separate from the extracted ones, so moving the slider never disturbs them.
+
+**Value studies** (`src/lib/valueStudy.ts`) space their steps *evenly* across
+the range of lightness the image contains — deliberately not the population-based
+clustering used for colour. On a subject against a white background more than
+half the pixels are the lightest value, so clustering spends every step
+separating near-whites and hands back a darkest value of mid-grey, leaving dark
+linework nowhere to sit. Measuring the range off the image (between percentiles,
+so one stray pixel can't stretch it) keeps that honest for high-key photographs.
 
 **Posterising** (`src/lib/posterise.ts`) maps every pixel to the nearest palette
 colour in OKLab, then cleans the result up — a 3×3 mode filter to kill speckle,

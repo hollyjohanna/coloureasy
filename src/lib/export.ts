@@ -2,7 +2,7 @@
  * Getting a palette out of the tool: a PNG sheet, and a JSON file.
  */
 
-import { formatAll, readableTextOn, rgbToHex } from './colour';
+import { formatAll, readableTextOn, rgbToHex, type Rgb } from './colour';
 import type { Swatch } from './palette';
 
 export function download(blob: Blob, filename: string) {
@@ -82,6 +82,49 @@ export async function exportPng(swatches: Swatch[], imageName: string) {
         ? 'picked'
         : `${(swatch.share * 100).toFixed(1)}%`;
     ctx.fillText(meta, x + SWATCH / 2, y + SWATCH + 20);
+  });
+
+  const blob = await new Promise<Blob | null>((resolve) =>
+    canvas.toBlob(resolve, 'image/png'),
+  );
+  if (blob) download(blob, `${baseName(imageName)}.png`);
+}
+
+/* ------------------------------------------------------------------ strip */
+
+const STRIP_WIDTH = 1600;
+const STRIP_HEIGHT = 900;
+const STRIP_DPR = 2;
+
+/**
+ * The palette as a single wide image — bars side by side with their hex codes,
+ * the shape people expect to paste into a moodboard or a message.
+ */
+export async function exportStrip(colours: Rgb[], imageName: string) {
+  if (colours.length === 0) return;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = STRIP_WIDTH * STRIP_DPR;
+  canvas.height = STRIP_HEIGHT * STRIP_DPR;
+
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('Could not get a 2D context for the palette strip.');
+  ctx.scale(STRIP_DPR, STRIP_DPR);
+
+  const barWidth = STRIP_WIDTH / colours.length;
+
+  colours.forEach((rgb, i) => {
+    const x = i * barWidth;
+    const hex = rgbToHex(rgb).toUpperCase();
+
+    ctx.fillStyle = hex;
+    // A hair of overlap, so sub-pixel bar edges never show a seam.
+    ctx.fillRect(x, 0, barWidth + 1, STRIP_HEIGHT);
+
+    ctx.fillStyle = readableTextOn(rgb);
+    ctx.font = '600 26px ui-monospace, "SF Mono", Menlo, monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(hex, x + barWidth / 2, STRIP_HEIGHT - 48);
   });
 
   const blob = await new Promise<Blob | null>((resolve) =>

@@ -147,6 +147,27 @@ export function usePalette() {
   // re-derives the extracted colours without disturbing anything hand-picked.
   const swatches = useMemo(() => [...extracted, ...manual], [extracted, manual]);
 
+  /**
+   * Read the palette at an arbitrary count without disturbing this hook's own
+   * `count`. Lets a second tool show five colours while the picker shows
+   * twenty, off the same tree — and because the tree is hierarchical, the ids
+   * stay stable as that count changes.
+   */
+  const derive = useCallback(
+    (n: number): Swatch[] => {
+      if (!tree) return [];
+      return deriveAtCount(tree, n).map((node) => ({
+        id: `g${node.id}`,
+        rgb: node.rgb,
+        x: node.x,
+        y: node.y,
+        source: 'extracted' as const,
+        share: tree.totalPixels ? node.count / tree.totalPixels : 0,
+      }));
+    },
+    [tree],
+  );
+
   const addAt = useCallback((x: number, y: number): Swatch | null => {
     const sampler = samplerRef.current;
     if (!sampler) return null;
@@ -199,6 +220,7 @@ export function usePalette() {
     /** how many colours this image can actually yield, <= MAX_COLOURS */
     available: tree ? maxAvailable(tree) : 0,
     canPick,
+    derive,
     openFile,
     openUrl,
     addAt,

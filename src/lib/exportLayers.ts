@@ -142,6 +142,7 @@ export async function exportReferenceSheet(
   layers: Layer[],
   palette: Rgb[],
   imageName: string,
+  suffix = 'reference',
 ) {
   const used = layers.filter((layer) => layer.pixels > 0);
   const { labels, width, height } = result;
@@ -173,7 +174,11 @@ export async function exportReferenceSheet(
   ctx.fillStyle = '#111111';
   ctx.font = '600 30px ui-sans-serif, system-ui, sans-serif';
   ctx.textAlign = 'left';
-  ctx.fillText(`${imageName} — ${used.length} colours`, MARGIN, y);
+  ctx.fillText(
+    `${imageName} — ${used.length} ${suffix === 'values' ? 'values' : 'colours'}`,
+    MARGIN,
+    y,
+  );
 
   y += 40;
 
@@ -209,5 +214,5 @@ export async function exportReferenceSheet(
   const blob = await new Promise<Blob | null>((resolve) =>
     canvas.toBlob(resolve, 'image/png'),
   );
-  if (blob) download(blob, `${baseName(imageName, 'reference')}.png`);
+  if (blob) download(blob, `${baseName(imageName, suffix)}.png`);
 }
