@@ -1,7 +1,9 @@
-import { useRef, type CSSProperties } from 'react';
+import { useRef, useState, type CSSProperties } from 'react';
 import { readableTextOn, rgbToHex } from '../lib/colour';
 import type { LoadedImage } from '../lib/loadImage';
 import type { Swatch } from '../lib/palette';
+import type { Rgb } from '../lib/colour';
+import Loupe from './Loupe';
 import Stage from './Stage';
 
 type Props = {
@@ -11,6 +13,8 @@ type Props = {
   onHover: (id: string | null) => void;
   onAdd: (x: number, y: number) => void;
   onRemove: (id: string) => void;
+  /** live colour under a point, for the magnifier */
+  peekAt: (x: number, y: number) => Rgb | null;
   canPick: boolean;
   zoom: number;
   onZoom: (zoom: number) => void;
@@ -23,11 +27,18 @@ export default function ImageStage({
   onHover,
   onAdd,
   onRemove,
+  peekAt,
   canPick,
   zoom,
   onZoom,
 }: Props) {
   const frameRef = useRef<HTMLDivElement>(null);
+  const [glass, setGlass] = useState<{ x: number; y: number; rgb: Rgb } | null>(null);
+
+  const look = (x: number, y: number) => {
+    const rgb = peekAt(x, y);
+    if (rgb) setGlass({ x, y, rgb });
+  };
 
   // The frame is sized by the image itself, so a click's offset within it maps
   // straight onto normalised image coordinates regardless of display size.
@@ -51,6 +62,12 @@ export default function ImageStage({
       frameRef={frameRef}
       onFrameClick={(e) => pick(e.clientX, e.clientY)}
       frameClassName={canPick ? 'cursor-crosshair' : 'cursor-progress'}
+      onHoldStart={look}
+      onHoldMove={look}
+      onHoldEnd={(x, y) => {
+        setGlass(null);
+        onAdd(x, y);
+      }}
     >
       <img
         src={image.src}
@@ -58,6 +75,17 @@ export default function ImageStage({
         draggable={false}
         className="block h-full w-full select-none"
       />
+
+      {glass && (
+        <Loupe
+          src={image.src}
+          width={image.width}
+          height={image.height}
+          x={glass.x}
+          y={glass.y}
+          rgb={glass.rgb}
+        />
+      )}
 
       {swatches.map((swatch) => (
         <Marker

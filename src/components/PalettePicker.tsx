@@ -5,6 +5,7 @@ import {
   type Pick,
 } from '../hooks/usePicks';
 import { formatAll, readableTextOn, rgbToHex } from '../lib/colour';
+import Loupe from './Loupe';
 import type { LoadedImage } from '../lib/loadImage';
 import Stage from './Stage';
 
@@ -159,6 +160,22 @@ export default function PalettePicker({
           draggable={false}
           className="block h-full w-full select-none"
         />
+
+        {/* While a marker is being dragged, magnify what is under it — the
+            same problem the colour picker has, so the same glass. */}
+        {picks.map((pick) =>
+          dragging === pick.id ? (
+            <Loupe
+              key={`glass-${pick.id}`}
+              src={image.src}
+              width={image.width}
+              height={image.height}
+              x={pick.x}
+              y={pick.y}
+              rgb={pick.rgb}
+            />
+          ) : null,
+        )}
 
         {picks.map((pick, i) => (
           <button

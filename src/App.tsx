@@ -370,6 +370,7 @@ export default function App() {
                     }
                   }}
                   onRemove={palette.removeManual}
+                  peekAt={palette.peekAt}
                   canPick={palette.canPick}
                   zoom={zoom}
                   onZoom={setZoom}

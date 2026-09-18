@@ -69,7 +69,7 @@ export default function PalettePanel({
         <p className="mt-2 text-xs text-faint">
           {capped
             ? `This image only has ${available} distinct colours to give.`
-            : `${MIN_COLOURS}–${MAX_COLOURS}. Click the image to add your own.`}
+            : `${MIN_COLOURS}–${MAX_COLOURS}. Click the image to add a colour, or hold to magnify. Click your own marker to remove it.`}
         </p>
       </div>
 
