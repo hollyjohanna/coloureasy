@@ -292,13 +292,14 @@ export default function App() {
                 image={palette.image}
                 picks={picks.picks}
                 count={picks.count}
-                onCount={picks.setCount}
+                onStep={picks.step}
                 onMove={picks.moveTo}
                 dragging={picks.dragging}
                 setDragging={picks.setDragging}
                 onReset={picks.reset}
                 edited={picks.edited}
                 onCopy={copy}
+                onReorder={picks.reorder}
                 zoom={zoom}
                 onZoom={setZoom}
                 onExportPng={() =>

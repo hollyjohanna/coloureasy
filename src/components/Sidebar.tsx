@@ -21,7 +21,7 @@ const TOOLS: {
     id: 'palette',
     label: 'Palette',
     short: 'Palette',
-    hint: 'Five colours, drag to re-pick',
+    hint: 'A few colours, yours to arrange',
     icon: '▦',
   },
   {

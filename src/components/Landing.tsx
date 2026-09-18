@@ -17,7 +17,7 @@ type Props = {
 };
 
 const TOOLS = [
-  ['Palette', 'Five colours from the image, dragged wherever you want them.'],
+  ['Palette', 'Two to ten colours from the image. Drag to re-pick or reorder.'],
   ['Colour Picker', 'Every colour, with hex, RGB, HSL, HSB and CMYK.'],
   ['Value Study', 'Tone alone, colour stripped out — the study before the paint.'],
   ['Layer Extractor', 'The image rebuilt from your palette, split into layers.'],
