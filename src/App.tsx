@@ -1,20 +1,21 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import DropZone from './components/DropZone';
 import ImageStage from './components/ImageStage';
+import Landing from './components/Landing';
 import Library from './components/Library';
 import LayerExtractor from './components/LayerExtractor';
 import LayerList from './components/LayerList';
 import PalettePanel from './components/PalettePanel';
 import PalettePicker from './components/PalettePicker';
-import SharedPalette from './components/SharedPalette';
 import Sidebar, { type Tool } from './components/Sidebar';
 import ValuePanel from './components/ValuePanel';
 import { useLibrary } from './hooks/useLibrary';
 import { usePalette } from './hooks/usePalette';
 import { usePicks } from './hooks/usePicks';
 import { usePosterise } from './hooks/usePosterise';
+import { useTheme } from './hooks/useTheme';
+import { useThumbUrls } from './hooks/useThumbUrls';
 import { useValueStudy } from './hooks/useValueStudy';
-import type { Rgb } from './lib/colour';
+import { rgbToHex, type Rgb } from './lib/colour';
 import { exportStrip } from './lib/export';
 import { exportLayerZip, exportReferenceSheet, type LayerMode } from './lib/exportLayers';
 import { paletteFromLocation, shareUrlFor } from './lib/shareUrl';
@@ -22,6 +23,8 @@ import { paletteFromLocation, shareUrlFor } from './lib/shareUrl';
 export default function App() {
   const palette = usePalette();
   const library = useLibrary();
+  const { theme, toggle: toggleTheme } = useTheme();
+  const thumbs = useThumbUrls(library.images);
   // Lands on a work tool, which with no image loaded shows the drop zone.
   // Opening on the Library instead would greet a first-time visitor with an
   // empty grid and every other tool greyed out.
@@ -198,35 +201,61 @@ export default function App() {
   return (
     <div className="flex h-full flex-col">
       <header className="flex shrink-0 items-center justify-between gap-4 border-b border-line px-5 py-3">
-        <div>
-          <h1 className="text-sm font-semibold tracking-tight">Colour Extractor</h1>
-          <p className="text-xs text-faint">
-            Pull a palette out of any image, in your browser.
-          </p>
+        <div className="min-w-0">
+          <h1 className="text-sm font-semibold tracking-tight">Colour Easy</h1>
+          {palette.image && (
+            <p className="truncate text-xs text-faint">{palette.image.name}</p>
+          )}
         </div>
 
-        {palette.image && (
+        <div className="flex shrink-0 items-center gap-2">
           <button
             type="button"
-            onClick={() => {
-              palette.reset();
-              setHovered(null);
-              // Land on the drop zone rather than leaving someone on the
-              // Library with every other tab disabled and nothing to click.
-              setTool(lastWorkTool.current);
-            }}
-            className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium transition-colors hover:bg-raised"
+            onClick={toggleTheme}
+            aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+            title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+            className="rounded-lg border border-line px-2.5 py-1.5 text-xs transition-colors hover:bg-raised"
           >
-            New image
+            <span aria-hidden>{theme === 'dark' ? '☀' : '☾'}</span>
           </button>
-        )}
+
+          {palette.image && (
+            <button
+              type="button"
+              onClick={() => {
+                palette.reset();
+                setHovered(null);
+                setTool(lastWorkTool.current);
+              }}
+              className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium transition-colors hover:bg-raised"
+            >
+              New image
+            </button>
+          )}
+        </div>
       </header>
 
+      {!palette.image ? (
+        <Landing
+          onFile={palette.openFile}
+          onUrl={palette.openUrl}
+          busy={busy}
+          recent={library.images.slice(0, 8)}
+          thumbs={thumbs}
+          onOpenRecent={openFromLibrary}
+          shared={shared}
+          onDismissShared={() => {
+            setShared([]);
+            history.replaceState(null, '', window.location.pathname);
+          }}
+          notify={notify}
+        />
+      ) : (
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto lg:flex-row lg:overflow-hidden">
         {/* Narrow screens scroll this whole column; from lg up the panes are
             fixed height and scroll their own contents. Without the mobile
             scroll the image overflows and covers the tool tabs. */}
-        <Sidebar tool={tool} onChange={setTool} hasImage={Boolean(palette.image)} />
+        <Sidebar tool={tool} onChange={setTool} hasImage />
 
         <main className="flex min-w-0 flex-col lg:min-h-0 lg:flex-1 lg:flex-row">
           {tool === 'library' && (
@@ -243,26 +272,11 @@ export default function App() {
               onDropCollection={library.dropCollection}
               onToggleIn={library.toggleIn}
               onAddImage={() => setTool(lastWorkTool.current)}
+              thumbs={thumbs}
             />
           )}
 
-          {tool !== 'library' && !palette.image && (
-            <div className="flex flex-1 flex-col items-center justify-center gap-10 py-10">
-              <DropZone onFile={palette.openFile} onUrl={palette.openUrl} busy={busy} />
-              {shared.length > 0 && (
-                <SharedPalette
-                  colours={shared}
-                  onDismiss={() => {
-                    setShared([]);
-                    history.replaceState(null, '', window.location.pathname);
-                  }}
-                  notify={notify}
-                />
-              )}
-            </div>
-          )}
-
-          {palette.image && (
+          {(
             <>
             {tool === 'palette' && (
               <PalettePicker
@@ -330,7 +344,16 @@ export default function App() {
                   swatches={palette.swatches}
                   hovered={hovered}
                   onHover={setHovered}
-                  onAdd={(x, y) => palette.addAt(x, y)}
+                  onAdd={(x, y) => {
+                    const result = palette.addAt(x, y);
+                    if (!result) return;
+                    if (result.duplicate) {
+                      setHovered(result.swatch.id);
+                      notify(
+                        `${rgbToHex(result.swatch.rgb).toUpperCase()} is already in your palette.`,
+                      );
+                    }
+                  }}
                   canPick={palette.canPick}
                 />
                 <PalettePanel
@@ -381,6 +404,7 @@ export default function App() {
           )}
         </main>
       </div>
+      )}
 
       {busy && (
         <div className="pointer-events-none fixed inset-x-0 top-0 h-0.5 overflow-hidden bg-line">

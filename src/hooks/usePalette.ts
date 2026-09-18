@@ -8,7 +8,7 @@ import {
   releaseImage,
   type LoadedImage,
 } from '../lib/loadImage';
-import type { Swatch } from '../lib/palette';
+import { findSameColour, type Swatch } from '../lib/palette';
 import {
   DEFAULT_COLOURS,
   deriveAtCount,
@@ -152,6 +152,11 @@ export function usePalette() {
   // re-derives the extracted colours without disturbing anything hand-picked.
   const swatches = useMemo(() => [...extracted, ...manual], [extracted, manual]);
 
+  // Read by addAt's duplicate check, which must see the current palette without
+  // being rebuilt every time that palette changes.
+  const swatchesRef = useRef<Swatch[]>([]);
+  swatchesRef.current = swatches;
+
   /**
    * Read the palette at an arbitrary count without disturbing this hook's own
    * `count`. Lets a second tool show five colours while the picker shows
@@ -173,22 +178,37 @@ export function usePalette() {
     [tree],
   );
 
-  const addAt = useCallback((x: number, y: number): Swatch | null => {
-    const sampler = samplerRef.current;
-    if (!sampler) return null;
+  /**
+   * Result of a click on the image: either a new swatch, or the one that was
+   * already holding that exact colour.
+   */
+  const addAt = useCallback(
+    (x: number, y: number): { swatch: Swatch; duplicate: boolean } | null => {
+      const sampler = samplerRef.current;
+      if (!sampler) return null;
 
-    const swatch: Swatch = {
-      id: `m${manualSeq.current++}`,
-      rgb: sampler.at(x, y),
-      x,
-      y,
-      source: 'manual',
-      share: 0,
-    };
+      const rgb = sampler.at(x, y);
 
-    setManual((prev) => [...prev, swatch]);
-    return swatch;
-  }, []);
+      // A palette with the same colour twice is never what anyone wants — it
+      // is two swatches to mix identically, and two markers to chase. Point at
+      // the existing one instead of adding another.
+      const existing = findSameColour(swatchesRef.current, rgb);
+      if (existing) return { swatch: existing, duplicate: true };
+
+      const swatch: Swatch = {
+        id: `m${manualSeq.current++}`,
+        rgb,
+        x,
+        y,
+        source: 'manual',
+        share: 0,
+      };
+
+      setManual((prev) => [...prev, swatch]);
+      return { swatch, duplicate: false };
+    },
+    [],
+  );
 
   const removeManual = useCallback(
     (id: string) => setManual((prev) => prev.filter((s) => s.id !== id)),

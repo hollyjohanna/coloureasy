@@ -1,19 +1,47 @@
 @import 'tailwindcss';
 
 /*
-  Deliberately achromatic chrome. This is a tool for judging colour, so the UI
-  around the swatches stays neutral grey — any hue in the surround shifts how
-  the extracted colours read, the same reason photo editors default to grey.
+  Deliberately achromatic chrome, in both themes. This is a tool for judging
+  colour, so the UI around the swatches stays neutral grey — any hue in the
+  surround shifts how the extracted colours read, the same reason photo editors
+  default to grey.
+
+  Raw values live on :root so they can be swapped per theme; `@theme inline`
+  then points Tailwind's utilities at the variables rather than at fixed
+  colours, so `bg-shell` follows the theme at runtime.
 */
-@theme {
-  --color-shell: #17181a;
-  --color-surface: #1f2124;
-  --color-raised: #292c30;
-  --color-line: #35383d;
-  --color-ink: #f2f3f4;
-  --color-muted: #9aa0a6;
-  --color-faint: #6b7076;
-  --color-accent: #e8eaed;
+:root {
+  --shell: #17181a;
+  --surface: #1f2124;
+  --raised: #292c30;
+  --line: #35383d;
+  --ink: #f2f3f4;
+  --muted: #9aa0a6;
+  --faint: #6b7076;
+  --checker: #2a2d31;
+  color-scheme: dark;
+}
+
+:root[data-theme='light'] {
+  --shell: #f6f6f7;
+  --surface: #ffffff;
+  --raised: #ebebed;
+  --line: #dcdce0;
+  --ink: #1a1b1d;
+  --muted: #5c6166;
+  --faint: #8a8f95;
+  --checker: #e4e4e7;
+  color-scheme: light;
+}
+
+@theme inline {
+  --color-shell: var(--shell);
+  --color-surface: var(--surface);
+  --color-raised: var(--raised);
+  --color-line: var(--line);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
 
   --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
@@ -27,8 +55,8 @@ body,
 
 body {
   margin: 0;
-  background: var(--color-shell);
-  color: var(--color-ink);
+  background: var(--shell);
+  color: var(--ink);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
 }
@@ -36,7 +64,7 @@ body {
 /* A visible focus ring everywhere, since markers and swatches are all keyboard
    reachable. */
 :focus-visible {
-  outline: 2px solid var(--color-accent);
+  outline: 2px solid var(--ink);
   outline-offset: 2px;
 }
 
@@ -44,10 +72,10 @@ body {
    as a colour in the image. */
 .checkerboard {
   background-image:
-    linear-gradient(45deg, #2a2d31 25%, transparent 25%),
-    linear-gradient(-45deg, #2a2d31 25%, transparent 25%),
-    linear-gradient(45deg, transparent 75%, #2a2d31 75%),
-    linear-gradient(-45deg, transparent 75%, #2a2d31 75%);
+    linear-gradient(45deg, var(--checker) 25%, transparent 25%),
+    linear-gradient(-45deg, var(--checker) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, var(--checker) 75%),
+    linear-gradient(-45deg, transparent 75%, var(--checker) 75%);
   background-size: 16px 16px;
   background-position:
     0 0,
@@ -66,7 +94,7 @@ input[type='range'] {
 input[type='range']::-webkit-slider-runnable-track {
   height: 4px;
   border-radius: 999px;
-  background: var(--color-line);
+  background: var(--line);
 }
 
 input[type='range']::-webkit-slider-thumb {
@@ -76,13 +104,13 @@ input[type='range']::-webkit-slider-thumb {
   height: 16px;
   margin-top: -6px;
   border-radius: 999px;
-  background: var(--color-ink);
+  background: var(--ink);
 }
 
 input[type='range']::-moz-range-track {
   height: 4px;
   border-radius: 999px;
-  background: var(--color-line);
+  background: var(--line);
 }
 
 input[type='range']::-moz-range-thumb {
@@ -90,7 +118,7 @@ input[type='range']::-moz-range-thumb {
   height: 16px;
   border: 0;
   border-radius: 999px;
-  background: var(--color-ink);
+  background: var(--ink);
 }
 
 @media (prefers-reduced-motion: reduce) {

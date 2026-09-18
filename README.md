@@ -1,7 +1,10 @@
-# Colour Extractor
+# Colour Easy
+
+[coloureasy.com](https://coloureasy.com)
 
 A painting-planning tool: keep your reference images, and break each one down
-into something you can mix and paint.
+into something you can mix and paint. There is no editor until you load an
+image — the landing page is the drop zone and nothing else.
 
 **Library** — every image you open is kept automatically, and you can file them
 into collections. Stored in the browser, so it belongs to one device and nothing
@@ -110,6 +113,13 @@ stackable in any order) or *cumulative* (each one a full coat over the last,
 stacked in order). Both are the same label map composited differently. They're
 bundled with `src/lib/zip.ts`, a ~120-line store-only ZIP writer — the PNGs are
 already compressed, so deflating again would only cost a 100KB dependency.
+
+**Theming** is two sets of raw values on `:root`, with `@theme inline` pointing
+Tailwind's utilities at the variables rather than at fixed colours, so every
+utility follows the theme at runtime. A small script in `index.html` resolves
+the choice before first paint, otherwise a dark-mode visitor gets a white flash
+on every load. Both palettes are achromatic on purpose: any hue in the surround
+shifts how the extracted colours read.
 
 **The library** (`src/lib/library.ts`) is IndexedDB, which holds Blobs — so the
 images themselves live beside their metadata and nothing needs a server. The

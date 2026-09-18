@@ -15,6 +15,7 @@ type Props = {
   onDropCollection: (id: string) => void;
   onToggleIn: (collectionId: string, imageId: string) => void;
   onAddImage: () => void;
+  thumbs: Record<string, string>;
 };
 
 const RECENT = 'recent';
@@ -23,22 +24,6 @@ const formatSize = (bytes: number) =>
   bytes > 1e9
     ? `${(bytes / 1e9).toFixed(1)}GB`
     : `${Math.round(bytes / 1e6)}MB`;
-
-/** Object URLs for the thumbnails, revoked when the set of images changes. */
-function useThumbUrls(images: ImageRecord[]) {
-  const [urls, setUrls] = useState<Record<string, string>>({});
-
-  useEffect(() => {
-    const next: Record<string, string> = {};
-    for (const image of images) next[image.id] = URL.createObjectURL(image.thumb);
-    setUrls(next);
-    return () => {
-      for (const url of Object.values(next)) URL.revokeObjectURL(url);
-    };
-  }, [images]);
-
-  return urls;
-}
 
 export default function Library({
   images,
@@ -53,10 +38,10 @@ export default function Library({
   onDropCollection,
   onToggleIn,
   onAddImage,
+  thumbs,
 }: Props) {
   const [active, setActive] = useState<string>(RECENT);
   const [filing, setFiling] = useState<string | null>(null);
-  const thumbs = useThumbUrls(images);
 
   // A collection can be deleted while it's the one being viewed.
   useEffect(() => {
