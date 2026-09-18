@@ -363,7 +363,11 @@ export default function App() {
                   onAdd={(x, y) => {
                     const result = palette.addAt(x, y);
                     if (!result) return;
-                    if (result.duplicate) {
+                    if (result.full) {
+                      notify(`That is as many colours as the palette holds.`);
+                      return;
+                    }
+                    if (result.duplicate && result.swatch) {
                       setHovered(result.swatch.id);
                       notify(
                         `${rgbToHex(result.swatch.rgb).toUpperCase()} is already in your palette.`,
@@ -380,6 +384,8 @@ export default function App() {
                   swatches={palette.swatches}
                   count={palette.count}
                   onCount={palette.setCount}
+                  total={palette.total}
+                  picked={palette.picked}
                   available={palette.available}
                   hovered={hovered}
                   onHover={setHovered}

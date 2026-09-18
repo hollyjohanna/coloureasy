@@ -12,7 +12,9 @@ import { findSameColour, type Swatch } from '../lib/palette';
 import {
   DEFAULT_COLOURS,
   deriveAtCount,
+  MAX_COLOURS,
   maxAvailable,
+  MIN_COLOURS,
   type PaletteTree,
 } from '../lib/quantise';
 import { createSampler, type Sampler } from '../lib/sample';
@@ -23,7 +25,12 @@ type Status = 'empty' | 'loading' | 'extracting' | 'ready' | 'error';
 export function usePalette() {
   const [image, setImage] = useState<LoadedImage | null>(null);
   const [tree, setTree] = useState<PaletteTree | null>(null);
-  const [count, setCount] = useState(DEFAULT_COLOURS);
+  /**
+   * How many colours the palette should hold in total, generated and
+   * hand-picked together. Picking one by hand therefore grows the number
+   * rather than quietly sitting outside it.
+   */
+  const [target, setTarget] = useState(DEFAULT_COLOURS);
   const [manual, setManual] = useState<Swatch[]>([]);
   const [status, setStatus] = useState<Status>('empty');
   const [error, setError] = useState<string | null>(null);
@@ -136,9 +143,13 @@ export function usePalette() {
     [accept],
   );
 
+  // Hand-picked colours are spent from the same budget, so the generated ones
+  // make room for them instead of the total creeping past what was asked for.
+  const generatedCount = Math.max(0, target - manual.length);
+
   const extracted = useMemo<Swatch[]>(() => {
-    if (!tree) return [];
-    return deriveAtCount(tree, count).map((node) => ({
+    if (!tree || generatedCount === 0) return [];
+    return deriveAtCount(tree, generatedCount).map((node) => ({
       id: `g${node.id}`,
       rgb: node.rgb,
       x: node.x,
@@ -146,7 +157,7 @@ export function usePalette() {
       source: 'extracted' as const,
       share: tree.totalPixels ? node.count / tree.totalPixels : 0,
     }));
-  }, [tree, count]);
+  }, [tree, generatedCount]);
 
   // Manual picks live separately from the derived palette, so moving the slider
   // re-derives the extracted colours without disturbing anything hand-picked.
@@ -156,6 +167,8 @@ export function usePalette() {
   // being rebuilt every time that palette changes.
   const swatchesRef = useRef<Swatch[]>([]);
   swatchesRef.current = swatches;
+  const manualRef = useRef<Swatch[]>([]);
+  manualRef.current = manual;
 
   /**
    * Read the palette at an arbitrary count without disturbing this hook's own
@@ -183,7 +196,10 @@ export function usePalette() {
    * already holding that exact colour.
    */
   const addAt = useCallback(
-    (x: number, y: number): { swatch: Swatch; duplicate: boolean } | null => {
+    (
+      x: number,
+      y: number,
+    ): { swatch: Swatch | null; duplicate: boolean; full?: boolean } | null => {
       const sampler = samplerRef.current;
       if (!sampler) return null;
 
@@ -195,6 +211,12 @@ export function usePalette() {
       const existing = findSameColour(swatchesRef.current, rgb);
       if (existing) return { swatch: existing, duplicate: true };
 
+      // At the ceiling there is nothing left to spend, and every remaining
+      // slot is already hand-picked.
+      if (manualRef.current.length >= MAX_COLOURS) {
+        return { swatch: null, duplicate: false, full: true };
+      }
+
       const swatch: Swatch = {
         id: `m${manualSeq.current++}`,
         rgb,
@@ -205,15 +227,35 @@ export function usePalette() {
       };
 
       setManual((prev) => [...prev, swatch]);
-      return { swatch, duplicate: false };
+      // Grow the palette to fit, unless it is already as big as it goes — at
+      // which point the new colour takes a generated one's place.
+      setTarget((t) => Math.min(MAX_COLOURS, t + 1));
+      return { swatch, duplicate: false, full: false };
     },
     [],
   );
 
-  const removeManual = useCallback(
-    (id: string) => setManual((prev) => prev.filter((s) => s.id !== id)),
-    [],
-  );
+  const setCount = useCallback((n: number) => {
+    const next = Math.min(MAX_COLOURS, Math.max(MIN_COLOURS, Math.round(n)));
+    setTarget(next);
+    // Sliding down eats the generated colours first, because `generatedCount`
+    // shrinks on its own. Only when they have run out does this bite into the
+    // hand-picked ones, most recent first.
+    setManual((prev) => (prev.length > next ? prev.slice(0, next) : prev));
+  }, []);
+
+  const removeManual = useCallback((id: string) => {
+    setManual((prev) => {
+      const next = prev.filter((s) => s.id !== id);
+      // Taking a colour out shrinks the palette, mirroring the way adding one
+      // grew it — otherwise a generated colour would silently slide into the
+      // gap and the count would never come back down.
+      if (next.length !== prev.length) {
+        setTarget((t) => Math.max(MIN_COLOURS, t - 1));
+      }
+      return next;
+    });
+  }, []);
 
   const peekAt = useCallback(
     (x: number, y: number): Rgb | null => samplerRef.current?.at(x, y) ?? null,
@@ -231,7 +273,7 @@ export function usePalette() {
     setTree(null);
     setManual([]);
     setError(null);
-    setCount(DEFAULT_COLOURS);
+    setTarget(DEFAULT_COLOURS);
     setStatus('empty');
   }, []);
 
@@ -240,9 +282,14 @@ export function usePalette() {
     status,
     error,
     swatches,
-    count,
+    /** what the slider is set to */
+    count: target,
     setCount,
-    /** how many colours this image can actually yield, <= MAX_COLOURS */
+    /** how many colours are actually in the palette right now */
+    total: swatches.length,
+    /** how many of those were placed by hand */
+    picked: manual.length,
+    /** how many distinct colours this image can yield, <= MAX_COLOURS */
     available: tree ? maxAvailable(tree) : 0,
     canPick,
     derive,

@@ -23,7 +23,7 @@
 
 import { oklabToRgb, type Oklab, type Rgb } from './colour';
 
-export const MAX_COLOURS = 64;
+export const MAX_COLOURS = 100;
 export const DEFAULT_COLOURS = 20;
 export const MIN_COLOURS = 2;
 

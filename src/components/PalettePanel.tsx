@@ -9,6 +9,10 @@ type Props = {
   swatches: Swatch[];
   count: number;
   onCount: (n: number) => void;
+  /** colours actually in the palette right now */
+  total: number;
+  /** how many of those were placed by hand */
+  picked: number;
   available: number;
   hovered: string | null;
   onHover: (id: string | null) => void;
@@ -21,6 +25,8 @@ export default function PalettePanel({
   swatches,
   count,
   onCount,
+  total,
+  picked,
   available,
   hovered,
   onHover,
@@ -39,10 +45,9 @@ export default function PalettePanel({
     }
   };
 
-  const manualCount = swatches.filter((s) => s.source === 'manual').length;
-  // An image with few distinct colours caps out below MAX_COLOURS; say so
-  // rather than letting the slider run on with nothing happening.
-  const capped = available > 0 && available < count;
+  // An image with few distinct colours caps out below the requested total; say
+  // so rather than letting the slider run on with nothing happening.
+  const capped = total > 0 && total < count;
 
   return (
     <aside className="flex w-full shrink-0 flex-col border-line bg-shell lg:w-[380px] lg:border-l">
@@ -51,9 +56,7 @@ export default function PalettePanel({
           <label htmlFor="count" className="text-sm font-medium">
             Colours
           </label>
-          <span className="font-mono text-sm tabular-nums text-muted">
-            {Math.min(count, available || count)}
-          </span>
+          <span className="font-mono text-sm tabular-nums text-muted">{total}</span>
         </div>
 
         <input
@@ -69,7 +72,9 @@ export default function PalettePanel({
         <p className="mt-2 text-xs text-faint">
           {capped
             ? `This image only has ${available} distinct colours to give.`
-            : `${MIN_COLOURS}–${MAX_COLOURS}. Click the image to add a colour, or hold to magnify. Click your own marker to remove it.`}
+            : picked > 0
+              ? `${total - picked} from the image, ${picked} picked by hand. Sliding down drops the generated ones first.`
+              : `${MIN_COLOURS}–${MAX_COLOURS}. Click the image to add a colour, or hold to magnify. Click your own marker to remove it.`}
         </p>
       </div>
 
@@ -93,12 +98,6 @@ export default function PalettePanel({
       </ul>
 
       <div className="space-y-2 border-t border-line px-5 py-4">
-        {manualCount > 0 && (
-          <p className="text-xs text-faint">
-            {manualCount} colour{manualCount === 1 ? '' : 's'} picked by hand.
-          </p>
-        )}
-
         <div className="grid grid-cols-3 gap-2">
           <ExportButton onClick={() => exportPng(swatches, imageName)}>
             PNG
