@@ -10,6 +10,7 @@
  * size, time, and rate.
  */
 
+import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { lookup } from 'node:dns/promises';
 import { isIP } from 'node:net';
 
@@ -121,22 +122,24 @@ async function assertPublicHost(hostname: string) {
   }
 }
 
-const bad = (status: number, error: string) =>
-  new Response(JSON.stringify({ error }), {
-    status,
-    headers: { 'content-type': 'application/json' },
-  });
+export type ProxyResult =
+  | { status: 200; body: ArrayBuffer; contentType: string }
+  | { status: number; error: string };
 
-export const config = { runtime: 'nodejs' };
+const bad = (status: number, error: string): ProxyResult => ({ status, error });
 
-export default async function handler(request: Request): Promise<Response> {
-  if (request.method !== 'GET') return bad(405, 'Use GET.');
-
-  const ip =
-    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
+/**
+ * The whole proxy, independent of any runtime.
+ *
+ * Kept separate from the handler below so the security guards can be tested
+ * directly, and so a change in how the host invokes functions only ever moves
+ * the adapter.
+ */
+export async function proxyImage(
+  target: string | undefined,
+  ip: string,
+): Promise<ProxyResult> {
   if (rateLimited(ip)) return bad(429, 'Too many requests. Give it a minute.');
-
-  const target = new URL(request.url).searchParams.get('url');
   if (!target) return bad(400, 'No url given.');
 
   let parsed: URL;
@@ -180,35 +183,21 @@ export default async function handler(request: Request): Promise<Response> {
     if (response.status >= 300 && response.status < 400) {
       return bad(502, 'That URL redirects too many times.');
     }
-    if (!response.ok) {
-      return bad(502, `The server returned ${response.status}.`);
-    }
+    if (!response.ok) return bad(502, `The server returned ${response.status}.`);
 
-    const type = response.headers.get('content-type') ?? '';
-    if (!type.startsWith('image/')) {
+    const contentType = response.headers.get('content-type') ?? '';
+    if (!contentType.startsWith('image/')) {
       return bad(415, 'That URL is not an image.');
     }
 
     const declared = Number(response.headers.get('content-length') ?? 0);
-    if (declared > MAX_BYTES) {
-      return bad(413, 'That image is too large.');
-    }
+    if (declared > MAX_BYTES) return bad(413, 'That image is too large.');
 
     const body = await response.arrayBuffer();
     // Re-check: content-length can lie, or be absent entirely.
-    if (body.byteLength > MAX_BYTES) {
-      return bad(413, 'That image is too large.');
-    }
+    if (body.byteLength > MAX_BYTES) return bad(413, 'That image is too large.');
 
-    return new Response(body, {
-      status: 200,
-      headers: {
-        'content-type': type,
-        'content-length': String(body.byteLength),
-        'cache-control': 'public, max-age=86400, s-maxage=86400',
-        'x-content-type-options': 'nosniff',
-      },
-    });
+    return { status: 200, body, contentType };
   } catch (error) {
     if (error instanceof Error && error.name === 'AbortError') {
       return bad(504, 'That image took too long to fetch.');
@@ -220,4 +209,47 @@ export default async function handler(request: Request): Promise<Response> {
   } finally {
     clearTimeout(timer);
   }
+}
+
+/**
+ * Vercel adapter.
+ *
+ * Deliberately the classic Node (req, res) signature rather than the
+ * web-standard Request/Response one: that shape belongs to the Edge runtime,
+ * and this function needs Node for `dns.lookup`, without which the SSRF guard
+ * cannot resolve a hostname before fetching it.
+ */
+export default async function handler(
+  request: VercelRequest,
+  response: VercelResponse,
+) {
+  if (request.method !== 'GET') {
+    response.status(405).json({ error: 'Use GET.' });
+    return;
+  }
+
+  const forwarded = request.headers['x-forwarded-for'];
+  const ip =
+    (Array.isArray(forwarded) ? forwarded[0] : forwarded)?.split(',')[0]?.trim() ??
+    'unknown';
+
+  const url = Array.isArray(request.query.url)
+    ? request.query.url[0]
+    : request.query.url;
+
+  const result = await proxyImage(url, ip);
+
+  if (result.status !== 200 || !('body' in result)) {
+    response
+      .status(result.status)
+      .json({ error: 'error' in result ? result.error : 'Unknown error.' });
+    return;
+  }
+
+  response
+    .status(200)
+    .setHeader('content-type', result.contentType)
+    .setHeader('cache-control', 'public, max-age=86400, s-maxage=86400')
+    .setHeader('x-content-type-options', 'nosniff')
+    .send(Buffer.from(result.body));
 }

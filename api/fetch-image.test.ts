@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import handler, { isPrivateAddress } from './fetch-image';
+import { isPrivateAddress, proxyImage } from './fetch-image';
 
 /**
  * These cover the guards that reject *before* any outbound request is made, so
@@ -8,26 +8,27 @@ import handler, { isPrivateAddress } from './fetch-image';
  * private network it runs in.
  */
 
-const call = (url: string, init?: RequestInit) =>
-  handler(new Request(`https://example.test/api/fetch-image?url=${encodeURIComponent(url)}`, init));
-
-const body = async (res: Response) => (await res.json()) as { error?: string };
+// Each test gets its own client address so the rate limiter, which is shared
+// module state, can't leak between them.
+let seq = 0;
+const call = (url: string | undefined) => proxyImage(url, `test-${seq++}`);
 
 describe('request shape', () => {
-  it('rejects anything but GET', async () => {
-    const res = await call('https://example.com/a.png', { method: 'POST' });
-    expect(res.status).toBe(405);
-  });
-
   it('rejects a missing url', async () => {
-    const res = await handler(new Request('https://example.test/api/fetch-image'));
-    expect(res.status).toBe(400);
-    expect((await body(res)).error).toMatch(/no url/i);
+    const result = await call(undefined);
+    expect(result.status).toBe(400);
+    expect('error' in result && result.error).toMatch(/no url/i);
   });
 
   it('rejects a malformed url', async () => {
-    const res = await call('not a url');
-    expect(res.status).toBe(400);
+    expect((await call('not a url')).status).toBe(400);
+  });
+
+  it('rate-limits a client that floods it', async () => {
+    const ip = 'flooder';
+    const results = [];
+    for (let i = 0; i < 35; i++) results.push(await proxyImage('nonsense', ip));
+    expect(results.some((r) => r.status === 429)).toBe(true);
   });
 });
 
@@ -39,9 +40,9 @@ describe('scheme guard', () => {
     'data:image/png;base64,iVBORw0KGgo=',
   ]) {
     it(`rejects ${url.split(':')[0]}:`, async () => {
-      const res = await call(url);
-      expect(res.status).toBe(400);
-      expect((await body(res)).error).toMatch(/http and https/i);
+      const result = await call(url);
+      expect(result.status).toBe(400);
+      expect('error' in result && result.error).toMatch(/http and https/i);
     });
   }
 });
@@ -65,9 +66,11 @@ describe('SSRF guard', () => {
 
   for (const [name, url] of blocked) {
     it(`blocks ${name}`, async () => {
-      const res = await call(url);
-      expect(res.status).toBe(502);
-      expect((await body(res)).error).toMatch(/not reachable|could not be resolved/i);
+      const result = await call(url);
+      expect(result.status).toBe(502);
+      expect('error' in result && result.error).toMatch(
+        /not reachable|could not be resolved/i,
+      );
     });
   }
 
