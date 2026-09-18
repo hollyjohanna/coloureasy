@@ -1,0 +1,103 @@
+@import 'tailwindcss';
+
+/*
+  Deliberately achromatic chrome. This is a tool for judging colour, so the UI
+  around the swatches stays neutral grey — any hue in the surround shifts how
+  the extracted colours read, the same reason photo editors default to grey.
+*/
+@theme {
+  --color-shell: #17181a;
+  --color-surface: #1f2124;
+  --color-raised: #292c30;
+  --color-line: #35383d;
+  --color-ink: #f2f3f4;
+  --color-muted: #9aa0a6;
+  --color-faint: #6b7076;
+  --color-accent: #e8eaed;
+
+  --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-shell);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* A visible focus ring everywhere, since markers and swatches are all keyboard
+   reachable. */
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* The checkerboard behind transparent PNGs, so alpha reads as alpha rather than
+   as a colour in the image. */
+.checkerboard {
+  background-image:
+    linear-gradient(45deg, #2a2d31 25%, transparent 25%),
+    linear-gradient(-45deg, #2a2d31 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #2a2d31 75%),
+    linear-gradient(-45deg, transparent 75%, #2a2d31 75%);
+  background-size: 16px 16px;
+  background-position:
+    0 0,
+    0 8px,
+    8px -8px,
+    -8px 0;
+}
+
+input[type='range'] {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+input[type='range']::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--color-line);
+}
+
+input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  margin-top: -6px;
+  border-radius: 999px;
+  background: var(--color-ink);
+}
+
+input[type='range']::-moz-range-track {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--color-line);
+}
+
+input[type='range']::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--color-ink);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
