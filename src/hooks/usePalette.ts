@@ -31,7 +31,13 @@ export function usePalette() {
    * rather than quietly sitting outside it.
    */
   const [target, setTarget] = useState(DEFAULT_COLOURS);
-  const [manual, setManual] = useState<Swatch[]>([]);
+  /**
+   * Colours that survive regeneration: picked by hand, or locked out of a
+   * generated palette. Both are spent from the same budget as generated ones.
+   */
+  const [pinned, setPinned] = useState<Swatch[]>([]);
+  /** generated colours the user has thrown away, so they don't come straight back */
+  const [excluded, setExcluded] = useState<ReadonlySet<string>>(new Set());
   const [status, setStatus] = useState<Status>('empty');
   const [error, setError] = useState<string | null>(null);
   // Mirrors samplerRef so the UI can re-render once click-to-add becomes live.
@@ -119,7 +125,8 @@ export function usePalette() {
         setCanPick(false);
         setImage(next);
         setTree(null);
-        setManual([]);
+        setPinned([]);
+        setExcluded(new Set());
         manualSeq.current = 0;
 
         await extract(next, seq);
@@ -143,32 +150,80 @@ export function usePalette() {
     [accept],
   );
 
-  // Hand-picked colours are spent from the same budget, so the generated ones
-  // make room for them instead of the total creeping past what was asked for.
-  const generatedCount = Math.max(0, target - manual.length);
+  // Hand-picked colours are spent from the budget, so the generated ones make
+  // room for them. Locked ones deliberately are not: a locked colour keeps the
+  // slot it already had in the tree, so locking one never disturbs the others.
+  const handPicked = useMemo(() => pinned.filter((s) => s.source === 'manual'), [pinned]);
+  const locks = useMemo(
+    () =>
+      new Map(
+        pinned.filter((s) => s.source === 'extracted' && s.locked).map((s) => [s.id, s]),
+      ),
+    [pinned],
+  );
 
-  const extracted = useMemo<Swatch[]>(() => {
-    if (!tree || generatedCount === 0) return [];
-    return deriveAtCount(tree, generatedCount).map((node) => ({
-      id: `g${node.id}`,
-      rgb: node.rgb,
-      x: node.x,
-      y: node.y,
-      source: 'extracted' as const,
-      share: tree.totalPixels ? node.count / tree.totalPixels : 0,
-    }));
-  }, [tree, generatedCount]);
+  const swatches = useMemo<Swatch[]>(() => {
+    if (!tree) return handPicked;
 
-  // Manual picks live separately from the derived palette, so moving the slider
-  // re-derives the extracted colours without disturbing anything hand-picked.
-  const swatches = useMemo(() => [...extracted, ...manual], [extracted, manual]);
+    const budget = Math.max(0, target - handPicked.length);
+
+    const derive = (want: number) => {
+      if (want === 0) return [];
+      // Removing a colour takes its bucket out of play, so ask the tree for
+      // more until enough survive — otherwise the palette would quietly shrink
+      // every time something was thrown away.
+      let nodes = deriveAtCount(tree, want).filter((n) => !excluded.has(`g${n.id}`));
+      for (let k = want + 1; nodes.length < want && k <= MAX_COLOURS; k++) {
+        const next = deriveAtCount(tree, k).filter((n) => !excluded.has(`g${n.id}`));
+        if (next.length === nodes.length) break;
+        nodes = next;
+      }
+      return nodes.slice(0, want);
+    };
+
+    // A locked colour usually still has its own bucket in the derive, and so
+    // costs nothing extra. Slide far enough down and it drops out of the tree
+    // while staying in the palette — then it does cost a slot, and the generated
+    // share has to shrink to pay for it. That is circular, so settle it by
+    // iterating; it converges in a couple of passes.
+    let want = budget;
+    let nodes = derive(want);
+    for (let pass = 0; pass < 4; pass++) {
+      const inTree = nodes.filter((n) => locks.has(`g${n.id}`)).length;
+      const next = Math.max(0, budget - (locks.size - inTree));
+      if (next === want) break;
+      want = next;
+      nodes = derive(want);
+    }
+
+    const shown = nodes.map((node) => {
+      const id = `g${node.id}`;
+      // A locked colour shows in the position it already occupied, from the
+      // copy taken when it was locked rather than from the live tree.
+      const held = locks.get(id);
+      if (held) return held;
+      return {
+        id,
+        rgb: node.rgb,
+        x: node.x,
+        y: node.y,
+        source: 'extracted' as const,
+        share: tree.totalPixels ? node.count / tree.totalPixels : 0,
+      };
+    });
+
+    const present = new Set(shown.map((s) => s.id));
+    const stranded = [...locks.values()].filter((s) => !present.has(s.id));
+
+    return [...shown, ...stranded, ...handPicked];
+  }, [tree, target, excluded, locks, handPicked]);
 
   // Read by addAt's duplicate check, which must see the current palette without
   // being rebuilt every time that palette changes.
   const swatchesRef = useRef<Swatch[]>([]);
   swatchesRef.current = swatches;
-  const manualRef = useRef<Swatch[]>([]);
-  manualRef.current = manual;
+  const pinnedRef = useRef<Swatch[]>([]);
+  pinnedRef.current = pinned;
 
   /**
    * Read the palette at an arbitrary count without disturbing this hook's own
@@ -213,7 +268,7 @@ export function usePalette() {
 
       // At the ceiling there is nothing left to spend, and every remaining
       // slot is already hand-picked.
-      if (manualRef.current.length >= MAX_COLOURS) {
+      if (pinnedRef.current.length >= MAX_COLOURS) {
         return { swatch: null, duplicate: false, full: true };
       }
 
@@ -226,7 +281,7 @@ export function usePalette() {
         share: 0,
       };
 
-      setManual((prev) => [...prev, swatch]);
+      setPinned((prev) => [...prev, swatch]);
       // Grow the palette to fit, unless it is already as big as it goes — at
       // which point the new colour takes a generated one's place.
       setTarget((t) => Math.min(MAX_COLOURS, t + 1));
@@ -236,25 +291,78 @@ export function usePalette() {
   );
 
   const setCount = useCallback((n: number) => {
-    const next = Math.min(MAX_COLOURS, Math.max(MIN_COLOURS, Math.round(n)));
+    const current = pinnedRef.current;
+    const lockedCount = current.filter((s) => s.locked).length;
+    // Locked colours set the floor: the slider cannot push below them.
+    const floor = Math.max(MIN_COLOURS, lockedCount);
+    const next = Math.min(MAX_COLOURS, Math.max(floor, Math.round(n)));
     setTarget(next);
     // Sliding down eats the generated colours first, because `generatedCount`
-    // shrinks on its own. Only when they have run out does this bite into the
-    // hand-picked ones, most recent first.
-    setManual((prev) => (prev.length > next ? prev.slice(0, next) : prev));
+    // shrinks on its own. Only once they have run out does this reach the
+    // pinned ones — unlocked, most recent first.
+    const picks = current.filter((s) => s.source === 'manual');
+    if (picks.length > next) {
+      // Most recent first, and never a locked one.
+      const drop = new Set(
+        picks
+          .slice()
+          .reverse()
+          .filter((s) => !s.locked)
+          .slice(0, picks.length - next)
+          .map((s) => s.id),
+      );
+      setPinned(current.filter((s) => !drop.has(s.id)));
+    }
   }, []);
 
-  const removeManual = useCallback((id: string) => {
-    setManual((prev) => {
-      const next = prev.filter((s) => s.id !== id);
-      // Taking a colour out shrinks the palette, mirroring the way adding one
-      // grew it — otherwise a generated colour would silently slide into the
-      // gap and the count would never come back down.
-      if (next.length !== prev.length) {
-        setTarget((t) => Math.max(MIN_COLOURS, t - 1));
+  /**
+   * Take a colour out of the palette.
+   *
+   * A generated colour has to be remembered as excluded, or the tree would
+   * simply hand it back on the next render. Locked colours refuse.
+   */
+  const remove = useCallback((id: string) => {
+    const pinnedNow = pinnedRef.current;
+    const held = pinnedNow.find((s) => s.id === id);
+    if (held?.locked) return;
+
+    if (held) {
+      setPinned(pinnedNow.filter((s) => s.id !== id));
+    } else {
+      setExcluded((prev) => new Set(prev).add(id));
+    }
+
+    // Removing shrinks the palette, mirroring the way adding grew it —
+    // otherwise another colour would slide into the gap and the count could
+    // only ever go up.
+    setTarget((t) => Math.max(MIN_COLOURS, t - 1));
+  }, []);
+
+  /**
+   * Pin a colour so the slider and the remove button leave it alone.
+   *
+   * Locking a generated colour copies it out of the tree, because the whole
+   * point is that it survives a palette the tree would otherwise re-derive.
+   */
+  const setLocked = useCallback((id: string, locked: boolean) => {
+    const existing = pinnedRef.current.find((s) => s.id === id);
+
+    if (existing) {
+      // A hand-picked colour is pinned whether it is locked or not. An
+      // extracted one is only pinned *because* it was locked, so unlocking
+      // gives it back to the tree rather than leaving it stuck in place.
+      if (!locked && existing.source === 'extracted') {
+        setPinned((prev) => prev.filter((s) => s.id !== id));
+      } else {
+        setPinned((prev) => prev.map((s) => (s.id === id ? { ...s, locked } : s)));
       }
-      return next;
-    });
+      return;
+    }
+
+    if (!locked) return;
+    const swatch = swatchesRef.current.find((s) => s.id === id);
+    if (!swatch) return;
+    setPinned((prev) => [...prev, { ...swatch, locked: true }]);
   }, []);
 
   const peekAt = useCallback(
@@ -271,7 +379,8 @@ export function usePalette() {
     setCanPick(false);
     setImage(null);
     setTree(null);
-    setManual([]);
+    setPinned([]);
+    setExcluded(new Set());
     setError(null);
     setTarget(DEFAULT_COLOURS);
     setStatus('empty');
@@ -287,8 +396,10 @@ export function usePalette() {
     setCount,
     /** how many colours are actually in the palette right now */
     total: swatches.length,
-    /** how many of those were placed by hand */
-    picked: manual.length,
+    /** how many were added by clicking the image */
+    picked: handPicked.length,
+    /** how many refuse to be removed or slid away */
+    locked: swatches.filter((s) => s.locked).length,
     /** how many distinct colours this image can yield, <= MAX_COLOURS */
     available: tree ? maxAvailable(tree) : 0,
     canPick,
@@ -297,7 +408,8 @@ export function usePalette() {
     openUrl,
     openBlob,
     addAt,
-    removeManual,
+    remove,
+    setLocked,
     peekAt,
     reset,
   };

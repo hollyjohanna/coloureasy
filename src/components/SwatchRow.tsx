@@ -8,7 +8,8 @@ type Props = {
   onToggle: () => void;
   onHover: (id: string | null) => void;
   onCopy: (label: string, value: string) => void;
-  onRemove?: () => void;
+  onRemove: () => void;
+  onToggleLock: () => void;
 };
 
 const ORDER = [
@@ -27,6 +28,7 @@ export default function SwatchRow({
   onHover,
   onCopy,
   onRemove,
+  onToggleLock,
 }: Props) {
   const formats = formatAll(swatch.rgb);
   const hex = rgbToHex(swatch.rgb);
@@ -36,7 +38,7 @@ export default function SwatchRow({
     <li
       onMouseEnter={() => onHover(swatch.id)}
       onMouseLeave={() => onHover(null)}
-      className={`overflow-hidden rounded-lg border transition-colors ${
+      className={`group/row relative overflow-hidden rounded-lg border transition-colors ${
         active ? 'border-ink' : 'border-line'
       }`}
     >
@@ -52,15 +54,53 @@ export default function SwatchRow({
         <span className="flex-1 font-mono text-sm font-medium">
           {formats.hex}
         </span>
-        <span className="font-mono text-xs opacity-70">
-          {swatch.source === 'manual'
-            ? 'picked'
-            : `${(swatch.share * 100).toFixed(1)}%`}
+        <span className="mr-14 font-mono text-xs opacity-70">
+          {swatch.locked
+            ? 'locked'
+            : swatch.source === 'manual'
+              ? 'picked'
+              : `${(swatch.share * 100).toFixed(1)}%`}
         </span>
         <span aria-hidden className="text-xs opacity-60">
           {expanded ? '−' : '+'}
         </span>
       </button>
+
+      {/* Sit over the colour rather than below it, so the row keeps its height
+          and the strip still reads as a run of colours. */}
+      <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center gap-1 pr-9">
+        <button
+          type="button"
+          onClick={onToggleLock}
+          aria-pressed={swatch.locked}
+          aria-label={`${swatch.locked ? 'Unlock' : 'Lock'} ${formats.hex}`}
+          title={
+            swatch.locked
+              ? 'Locked — the slider and remove leave this one alone'
+              : 'Lock this colour'
+          }
+          className={`pointer-events-auto grid h-6 w-6 place-items-center rounded text-[11px] transition-opacity ${
+            swatch.locked
+              ? 'opacity-90'
+              : 'opacity-0 group-hover/row:opacity-70 focus-visible:opacity-100'
+          }`}
+          style={{ color: ink }}
+        >
+          {swatch.locked ? '🔒' : '🔓'}
+        </button>
+
+        <button
+          type="button"
+          onClick={onRemove}
+          disabled={swatch.locked}
+          aria-label={`Remove ${formats.hex}`}
+          title={swatch.locked ? 'Locked colours cannot be removed' : 'Remove this colour'}
+          className="pointer-events-auto grid h-6 w-6 place-items-center rounded text-sm opacity-0 transition-opacity group-hover/row:opacity-70 hover:!opacity-100 focus-visible:opacity-100 disabled:!opacity-0"
+          style={{ color: ink }}
+        >
+          ×
+        </button>
+      </span>
 
       {expanded && (
         <dl className="divide-y divide-line bg-surface">
@@ -82,17 +122,6 @@ export default function SwatchRow({
             </div>
           ))}
 
-          {onRemove && (
-            <div className="px-3 py-2">
-              <button
-                type="button"
-                onClick={onRemove}
-                className="text-[11px] text-muted transition-colors hover:text-ink"
-              >
-                Remove this colour
-              </button>
-            </div>
-          )}
         </dl>
       )}
     </li>

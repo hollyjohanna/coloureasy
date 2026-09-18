@@ -374,7 +374,7 @@ export default function App() {
                       );
                     }
                   }}
-                  onRemove={palette.removeManual}
+                  onRemove={palette.remove}
                   peekAt={palette.peekAt}
                   canPick={palette.canPick}
                   zoom={zoom}
@@ -386,10 +386,12 @@ export default function App() {
                   onCount={palette.setCount}
                   total={palette.total}
                   picked={palette.picked}
+                  locked={palette.locked}
                   available={palette.available}
                   hovered={hovered}
                   onHover={setHovered}
-                  onRemove={palette.removeManual}
+                  onRemove={palette.remove}
+                  onToggleLock={palette.setLocked}
                   imageName={palette.image.name}
                   notify={notify}
                 />

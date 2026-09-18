@@ -13,10 +13,13 @@ type Props = {
   total: number;
   /** how many of those were placed by hand */
   picked: number;
+  /** how many are locked against the slider */
+  locked: number;
   available: number;
   hovered: string | null;
   onHover: (id: string | null) => void;
   onRemove: (id: string) => void;
+  onToggleLock: (id: string, locked: boolean) => void;
   imageName: string;
   notify: (message: string) => void;
 };
@@ -27,10 +30,12 @@ export default function PalettePanel({
   onCount,
   total,
   picked,
+  locked,
   available,
   hovered,
   onHover,
   onRemove,
+  onToggleLock,
   imageName,
   notify,
 }: Props) {
@@ -72,9 +77,15 @@ export default function PalettePanel({
         <p className="mt-2 text-xs text-faint">
           {capped
             ? `This image only has ${available} distinct colours to give.`
-            : picked > 0
-              ? `${total - picked} from the image, ${picked} picked by hand. Sliding down drops the generated ones first.`
-              : `${MIN_COLOURS}–${MAX_COLOURS}. Click the image to add a colour, or hold to magnify. Click your own marker to remove it.`}
+            : picked > 0 || locked > 0
+              ? [
+                  `${total - picked} from the image`,
+                  picked > 0 && `${picked} picked by hand`,
+                  locked > 0 && `${locked} locked`,
+                ]
+                  .filter(Boolean)
+                  .join(', ') + '. Sliding down drops the unlocked ones first.'
+              : `${MIN_COLOURS}–${MAX_COLOURS}. Click the image to add a colour, or hold to magnify. Hover a swatch to lock or remove it.`}
         </p>
       </div>
 
@@ -90,9 +101,8 @@ export default function PalettePanel({
             }
             onHover={onHover}
             onCopy={copy}
-            onRemove={
-              swatch.source === 'manual' ? () => onRemove(swatch.id) : undefined
-            }
+            onRemove={() => onRemove(swatch.id)}
+            onToggleLock={() => onToggleLock(swatch.id, !swatch.locked)}
           />
         ))}
       </ul>

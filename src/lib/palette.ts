@@ -8,6 +8,8 @@ export type Swatch = {
   x: number;
   y: number;
   source: 'extracted' | 'manual';
+  /** kept whatever the count slider does, and refuses to be removed */
+  locked?: boolean;
   /** share of sampled pixels this colour represents, 0-1; 0 for manual picks */
   share: number;
 };
