@@ -121,8 +121,13 @@ export default function Stage({
     if (!pane || width === 0 || height === 0) return;
 
     const measure = () => {
-      const available = Math.max(1, pane.clientWidth - INSET);
-      const tall = Math.max(1, pane.clientHeight - INSET);
+      // offsetWidth/Height rather than clientWidth/Height: the latter shrinks
+      // the instant a scrollbar appears, which — at sizes where the fit sits
+      // right on the edge of overflowing — would make that shrink remove the
+      // overflow, remove the scrollbar, grow clientWidth back, and repeat
+      // forever. The outer box is unaffected by a scrollbar drawn inside it.
+      const available = Math.max(1, pane.offsetWidth - INSET);
+      const tall = Math.max(1, pane.offsetHeight - INSET);
       const scale = Math.min(available / width, tall / height);
       setFitted({ w: width * scale, h: height * scale });
     };
