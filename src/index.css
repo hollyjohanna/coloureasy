@@ -121,6 +121,73 @@ input[type='range']::-moz-range-thumb {
   background: var(--ink);
 }
 
+/* Two range inputs sharing one track (RangeSlider). The inputs are
+   transparent and click-through; only their thumbs take the pointer. */
+.dual-range input[type='range'] {
+  position: absolute;
+  inset-inline: 0;
+  top: 50%;
+  width: 100%;
+  margin: 0;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.dual-range input[type='range']::-webkit-slider-runnable-track {
+  background: transparent;
+}
+
+.dual-range input[type='range']::-moz-range-track {
+  background: transparent;
+}
+
+.dual-range input[type='range']::-webkit-slider-thumb {
+  pointer-events: auto;
+}
+
+.dual-range input[type='range']::-moz-range-thumb {
+  pointer-events: auto;
+}
+
+/* The colour-family slider. The chrome stays grey everywhere else; this track
+   is content — it is the thing being chosen. */
+.hue-range::-webkit-slider-runnable-track {
+  height: 8px;
+  background: linear-gradient(
+    to right,
+    oklch(0.72 0.14 0),
+    oklch(0.72 0.14 60),
+    oklch(0.72 0.14 120),
+    oklch(0.72 0.14 180),
+    oklch(0.72 0.14 240),
+    oklch(0.72 0.14 300),
+    oklch(0.72 0.14 360)
+  );
+}
+
+.hue-range::-webkit-slider-thumb {
+  margin-top: -4px;
+  box-shadow: 0 0 0 2px var(--shell);
+}
+
+.hue-range::-moz-range-track {
+  height: 8px;
+  background: linear-gradient(
+    to right,
+    oklch(0.72 0.14 0),
+    oklch(0.72 0.14 60),
+    oklch(0.72 0.14 120),
+    oklch(0.72 0.14 180),
+    oklch(0.72 0.14 240),
+    oklch(0.72 0.14 300),
+    oklch(0.72 0.14 360)
+  );
+}
+
+.hue-range::-moz-range-thumb {
+  box-shadow: 0 0 0 2px var(--shell);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

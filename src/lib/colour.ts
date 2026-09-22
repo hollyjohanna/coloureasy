@@ -94,6 +94,23 @@ export function oklabToRgb({ L, a, b }: Oklab): Rgb {
   };
 }
 
+export type Oklch = { L: number; C: number; h: number };
+
+/**
+ * OKLab in polar form: chroma is how far from grey, hue an angle in degrees
+ * (0-360). Hue is meaningless for near-greys — check C before trusting it.
+ */
+export function oklabToOklch({ L, a, b }: Oklab): Oklch {
+  const h = (Math.atan2(b, a) * 180) / Math.PI;
+  return { L, C: Math.sqrt(a * a + b * b), h: h < 0 ? h + 360 : h };
+}
+
+/** Shortest way round the colour wheel between two hues, 0-180 degrees. */
+export function hueDistance(a: number, b: number): number {
+  const d = Math.abs(a - b) % 360;
+  return d > 180 ? 360 - d : d;
+}
+
 /* ------------------------------------------------------------ HSL / HSV */
 
 export function rgbToHsl({ r, g, b }: Rgb): Hsl {

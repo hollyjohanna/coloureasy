@@ -6,22 +6,26 @@ import LayerExtractor from './components/LayerExtractor';
 import LayerList from './components/LayerList';
 import PalettePanel from './components/PalettePanel';
 import PalettePicker from './components/PalettePicker';
+import PickerSettings, { FineTunePanel, useFineTuneOpen } from './components/PickerSettings';
 import Sidebar, { type Tool } from './components/Sidebar';
 import ValuePanel from './components/ValuePanel';
 import { useLibrary } from './hooks/useLibrary';
 import { usePalette } from './hooks/usePalette';
+import { usePickerSettings } from './hooks/usePickerSettings';
 import { usePicks } from './hooks/usePicks';
 import { usePosterise } from './hooks/usePosterise';
 import { useTheme } from './hooks/useTheme';
 import { useThumbUrls } from './hooks/useThumbUrls';
 import { useValueStudy } from './hooks/useValueStudy';
-import { rgbToHex, type Rgb } from './lib/colour';
+import { oklabToOklch, rgbToHex, rgbToOklab, type Rgb } from './lib/colour';
+import { NEUTRAL_CHROMA } from './lib/pickerSettings';
 import { exportStrip } from './lib/export';
 import { exportLayerZip, exportReferenceSheet, type LayerMode } from './lib/exportLayers';
 import { paletteFromLocation, shareUrlFor } from './lib/shareUrl';
 
 export default function App() {
-  const palette = usePalette();
+  const pickerSettings = usePickerSettings();
+  const palette = usePalette(pickerSettings.settings);
   const library = useLibrary();
   const { theme, toggle: toggleTheme } = useTheme();
   const thumbs = useThumbUrls(library.images);
@@ -38,6 +42,10 @@ export default function App() {
   // Shared across tools, so zooming in to pick a colour and then switching to
   // the value study keeps you looking at the same part of the picture.
   const [zoom, setZoom] = useState(1);
+  // The next click on the picker's image sets the colour family instead of
+  // adding a swatch.
+  const [pickingHue, setPickingHue] = useState(false);
+  const [fineTuneOpen, setFineTuneOpen] = useFineTuneOpen();
 
   const colours = useMemo(() => palette.swatches.map((s) => s.rgb), [palette.swatches]);
 
@@ -86,6 +94,11 @@ export default function App() {
   useEffect(() => {
     setZoom(1);
   }, [palette.image]);
+
+  // A half-finished "pick a hue" shouldn't be waiting to ambush a later click.
+  useEffect(() => {
+    setPickingHue(false);
+  }, [tool, palette.image]);
 
   // Every image that gets opened is remembered, which is what makes Recent a
   // recent list. Filing into a collection stays deliberate.
@@ -362,6 +375,18 @@ export default function App() {
                   hovered={hovered}
                   onHover={setHovered}
                   onAdd={(x, y) => {
+                    if (pickingHue) {
+                      setPickingHue(false);
+                      const rgb = palette.peekAt(x, y);
+                      if (!rgb) return;
+                      const { C, h } = oklabToOklch(rgbToOklab(rgb));
+                      if (C < NEUTRAL_CHROMA) {
+                        notify('That is too close to grey to have a hue. Try a stronger colour.');
+                        return;
+                      }
+                      pickerSettings.update({ focusHue: Math.round(h) % 360 });
+                      return;
+                    }
                     const result = palette.addAt(x, y);
                     if (!result) return;
                     if (result.full) {
@@ -381,6 +406,15 @@ export default function App() {
                   zoom={zoom}
                   onZoom={setZoom}
                 />
+                {fineTuneOpen && (
+                  <FineTunePanel
+                    settings={pickerSettings.settings}
+                    onChange={pickerSettings.update}
+                    picking={pickingHue}
+                    onPicking={setPickingHue}
+                    onClose={() => setFineTuneOpen(false)}
+                  />
+                )}
                 <PalettePanel
                   swatches={palette.swatches}
                   count={palette.count}
@@ -389,6 +423,34 @@ export default function App() {
                   picked={palette.picked}
                   locked={palette.locked}
                   available={palette.available}
+                  shaped={palette.shaped}
+                  sort={pickerSettings.settings.sort}
+                  onSort={(sort) => pickerSettings.update({ sort })}
+                  settings={
+                    <PickerSettings
+                      settings={pickerSettings.settings}
+                      onChange={pickerSettings.update}
+                      onMood={pickerSettings.applyMood}
+                      presets={pickerSettings.presets}
+                      onPreset={pickerSettings.applyPreset}
+                      onDeletePreset={pickerSettings.deletePreset}
+                      onSavePreset={(name) => {
+                        pickerSettings.savePreset(name);
+                        notify(`Saved “${name.trim()}”.`);
+                      }}
+                      savedDefault={pickerSettings.savedDefault}
+                      onSaveDefault={() => {
+                        pickerSettings.saveDefault();
+                        notify('The Colour Picker will start with these settings from now on.');
+                      }}
+                      onResetDefault={pickerSettings.resetToDefault}
+                      picking={pickingHue}
+                      onPicking={setPickingHue}
+                      pooling={palette.pooling}
+                      open={fineTuneOpen}
+                      onOpen={setFineTuneOpen}
+                    />
+                  }
                   hovered={hovered}
                   onHover={setHovered}
                   onRemove={palette.remove}

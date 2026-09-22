@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { exportJson, exportPng } from '../lib/export';
 import type { Swatch } from '../lib/palette';
+import { SORT_ORDERS, type SortOrder } from '../lib/pickerSettings';
 import { MAX_COLOURS, MIN_COLOURS } from '../lib/quantise';
 import { shareUrlFor } from '../lib/shareUrl';
 import SwatchRow from './SwatchRow';
@@ -16,6 +17,13 @@ type Props = {
   /** how many are locked against the slider */
   locked: number;
   available: number;
+  /** the picker settings are narrowing which colours can be chosen */
+  shaped: boolean;
+  /** how the list is ordered */
+  sort: SortOrder;
+  onSort: (sort: SortOrder) => void;
+  /** the picker settings, rendered under the count */
+  settings: React.ReactNode;
   hovered: string | null;
   onHover: (id: string | null) => void;
   onRemove: (id: string) => void;
@@ -32,6 +40,10 @@ export default function PalettePanel({
   picked,
   locked,
   available,
+  shaped,
+  sort,
+  onSort,
+  settings,
   hovered,
   onHover,
   onRemove,
@@ -76,7 +88,11 @@ export default function PalettePanel({
 
         <p className="mt-2 text-xs text-faint">
           {capped
-            ? `This image only has ${available} distinct colours to give.`
+            ? shaped
+              ? available === 0
+                ? 'Nothing in this image matches these settings. Try widening the ranges.'
+                : `Only ${available} colours in this image match these settings.`
+              : `This image only has ${available} distinct colours to give.`
             : picked > 0 || locked > 0
               ? [
                   `${total - picked} from the image`,
@@ -87,9 +103,29 @@ export default function PalettePanel({
                   .join(', ') + '. Sliding down drops the unlocked ones first.'
               : `${MIN_COLOURS}–${MAX_COLOURS}. Click the image to add a colour, or hold to magnify. Hover a swatch to lock or remove it.`}
         </p>
+
+        <label className="mt-3 flex items-center justify-between gap-3">
+          <span className="text-xs font-medium">Order</span>
+          <select
+            value={sort}
+            onChange={(e) => onSort(e.target.value as SortOrder)}
+            className="rounded-lg border border-line bg-surface px-2 py-1 text-xs"
+          >
+            {SORT_ORDERS.map((o) => (
+              <option key={o.id} value={o.id}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </label>
       </div>
 
-      <ul className="space-y-1.5 px-3 py-3 lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
+      {/* Settings and swatches scroll together: opening Fine-tune pushes the
+          list down rather than squeezing it to a sliver. */}
+      <div className="lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
+      {settings}
+
+      <ul className="space-y-1.5 px-3 py-3">
         {swatches.map((swatch) => (
           <SwatchRow
             key={swatch.id}
@@ -106,6 +142,7 @@ export default function PalettePanel({
           />
         ))}
       </ul>
+      </div>
 
       <div className="space-y-2 border-t border-line px-5 py-4">
         <div className="grid grid-cols-3 gap-2">

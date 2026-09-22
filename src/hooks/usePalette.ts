@@ -10,21 +10,41 @@ import {
 } from '../lib/loadImage';
 import { findSameColour, type Swatch } from '../lib/palette';
 import {
+  filterKey,
+  isNeutral,
+  toPixelFilter,
+  type PickerSettings,
+} from '../lib/pickerSettings';
+import {
   DEFAULT_COLOURS,
   deriveAtCount,
   MAX_COLOURS,
   maxAvailable,
   MIN_COLOURS,
+  type PaletteNode,
   type PaletteTree,
 } from '../lib/quantise';
 import { createSampler, type Sampler } from '../lib/sample';
-import type { WorkerResponse } from '../workers/palette.worker';
+import { selectColours, sortBy } from '../lib/select';
+import type { WorkerRequest, WorkerResponse } from '../workers/palette.worker';
 
 type Status = 'empty' | 'loading' | 'extracting' | 'ready' | 'error';
 
-export function usePalette() {
+/** Filter changes re-quantise in the worker; let a dragged slider settle first. */
+const POOL_DEBOUNCE_MS = 150;
+
+/**
+ * @param settings how the picker shapes its generated colours. Neutral
+ *   settings take the original area-led path exactly; anything else picks from
+ *   a filtered pool the worker builds on request.
+ */
+export function usePalette(settings: PickerSettings) {
   const [image, setImage] = useState<LoadedImage | null>(null);
   const [tree, setTree] = useState<PaletteTree | null>(null);
+  /** the natural tree re-run over only the pixels the picker's filters allow */
+  const [pool, setPool] = useState<{ key: string; tree: PaletteTree; gen: number } | null>(
+    null,
+  );
   /**
    * How many colours the palette should hold in total, generated and
    * hand-picked together. Picking one by hand therefore grows the number
@@ -49,6 +69,11 @@ export function usePalette() {
   const manualSeq = useRef(0);
   // Guards against a slow first image resolving after a second one was dropped.
   const loadSeq = useRef(0);
+  // The pool most recently asked for; an older reply still in flight is stale.
+  const poolKeyRef = useRef<string | null>(null);
+  // Stamped into pool swatch ids. Node ids restart with every pool, so without
+  // it a colour locked from an old pool would claim an unrelated new one's slot.
+  const poolGen = useRef(0);
 
   imageRef.current = image;
 
@@ -73,17 +98,29 @@ export function usePalette() {
     });
     workerRef.current = worker;
 
+    // The worker stays up for as long as this image does: picker filters send
+    // it back to the pixels it already holds. A newer image terminates it.
     worker.onmessage = (event: MessageEvent<WorkerResponse>) => {
       if (seq !== loadSeq.current) return;
-      if (event.data.ok) {
-        setTree(event.data.tree);
+      const data = event.data;
+
+      if (data.type === 'pool') {
+        if (data.key !== poolKeyRef.current) return;
+        setPool({ key: data.key, tree: data.tree, gen: ++poolGen.current });
+        // Exclusions against the old pool can never match again; drop them.
+        setExcluded((prev) => new Set([...prev].filter((id) => !id.startsWith('p'))));
+        return;
+      }
+
+      if (data.ok) {
+        setTree(data.tree);
         setStatus('ready');
       } else {
-        setError(event.data.error);
+        setError(data.error);
         setStatus('error');
+        worker.terminate();
+        if (workerRef.current === worker) workerRef.current = null;
       }
-      worker.terminate();
-      if (workerRef.current === worker) workerRef.current = null;
     };
 
     worker.onerror = () => {
@@ -92,7 +129,8 @@ export function usePalette() {
       setStatus('error');
     };
 
-    worker.postMessage({ bitmap }, [bitmap]);
+    const request: WorkerRequest = { type: 'load', bitmap };
+    worker.postMessage(request, [bitmap]);
 
     // Kick off the full-resolution sampler in parallel; click-to-add needs it,
     // but the palette shouldn't wait on it.
@@ -125,6 +163,8 @@ export function usePalette() {
         setCanPick(false);
         setImage(next);
         setTree(null);
+        setPool(null);
+        poolKeyRef.current = null;
         setPinned([]);
         setExcluded(new Set());
         manualSeq.current = 0;
@@ -162,19 +202,62 @@ export function usePalette() {
     [pinned],
   );
 
+  const shaped = !isNeutral(settings);
+  const key = filterKey(settings);
+  const settingsRef = useRef(settings);
+  settingsRef.current = settings;
+
+  // Ask the worker for a pool whenever the eligible pixels change. The last
+  // pool keeps showing until the new one lands, so dragging a slider never
+  // blanks the palette.
+  useEffect(() => {
+    if (!tree || !shaped || pool?.key === key) return;
+    const timer = setTimeout(() => {
+      poolKeyRef.current = key;
+      const request: WorkerRequest = {
+        type: 'pool',
+        key,
+        filter: toPixelFilter(settingsRef.current),
+      };
+      workerRef.current?.postMessage(request);
+    }, POOL_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [tree, shaped, key, pool?.key]);
+
+  /**
+   * Every colour the shaped picker would add, best first. Computed once for
+   * all counts and sliced, so moving the count never reshuffles.
+   */
+  const sequence = useMemo(() => {
+    if (!tree || !shaped || !pool) return null;
+    return selectColours(pool.tree, settings, tree.totalPixels, MAX_COLOURS);
+  }, [tree, shaped, pool, settings]);
+
   const swatches = useMemo<Swatch[]>(() => {
     if (!tree) return handPicked;
 
     const budget = Math.max(0, target - handPicked.length);
 
-    const derive = (want: number) => {
+    const derive = (want: number): { id: string; node: PaletteNode }[] => {
       if (want === 0) return [];
+
+      if (sequence && pool) {
+        return sequence
+          .map((node) => ({ id: `p${pool.gen}.${node.id}`, node }))
+          .filter((c) => !excluded.has(c.id))
+          .slice(0, want);
+      }
+
       // Removing a colour takes its bucket out of play, so ask the tree for
       // more until enough survive — otherwise the palette would quietly shrink
       // every time something was thrown away.
-      let nodes = deriveAtCount(tree, want).filter((n) => !excluded.has(`g${n.id}`));
+      const at = (k: number) =>
+        deriveAtCount(tree, k)
+          .map((node) => ({ id: `g${node.id}`, node }))
+          .filter((c) => !excluded.has(c.id));
+      let nodes = at(want);
       for (let k = want + 1; nodes.length < want && k <= MAX_COLOURS; k++) {
-        const next = deriveAtCount(tree, k).filter((n) => !excluded.has(`g${n.id}`));
+        const next = at(k);
         if (next.length === nodes.length) break;
         nodes = next;
       }
@@ -189,15 +272,14 @@ export function usePalette() {
     let want = budget;
     let nodes = derive(want);
     for (let pass = 0; pass < 4; pass++) {
-      const inTree = nodes.filter((n) => locks.has(`g${n.id}`)).length;
+      const inTree = nodes.filter((c) => locks.has(c.id)).length;
       const next = Math.max(0, budget - (locks.size - inTree));
       if (next === want) break;
       want = next;
       nodes = derive(want);
     }
 
-    const shown = nodes.map((node) => {
-      const id = `g${node.id}`;
+    const shown = nodes.map(({ id, node }): Swatch => {
       // A locked colour shows in the position it already occupied, from the
       // copy taken when it was locked rather than from the live tree.
       const held = locks.get(id);
@@ -208,6 +290,7 @@ export function usePalette() {
         x: node.x,
         y: node.y,
         source: 'extracted' as const,
+        // Share of the whole image, even for a colour from a filtered pool.
         share: tree.totalPixels ? node.count / tree.totalPixels : 0,
       };
     });
@@ -215,8 +298,21 @@ export function usePalette() {
     const present = new Set(shown.map((s) => s.id));
     const stranded = [...locks.values()].filter((s) => !present.has(s.id));
 
-    return [...shown, ...stranded, ...handPicked];
-  }, [tree, target, excluded, locks, handPicked]);
+    const all = [...shown, ...stranded, ...handPicked];
+    if (settings.sort === 'natural') return all;
+    if (settings.sort === 'picked') {
+      // Hand-picked in the order they were added, then locked, then the rest.
+      const mine = new Set([...handPicked, ...all.filter((s) => s.locked)]);
+      return [
+        ...handPicked,
+        ...all.filter((s) => s.locked && s.source !== 'manual'),
+        ...all.filter((s) => !mine.has(s)),
+      ];
+    }
+    // A real sort covers everything, hand-picked colours included — "dark to
+    // light" with the picks stuck at the bottom regardless would be a lie.
+    return sortBy(all, settings.sort);
+  }, [tree, target, excluded, locks, handPicked, sequence, pool, settings.sort]);
 
   // Read by addAt's duplicate check, which must see the current palette without
   // being rebuilt every time that palette changes.
@@ -379,6 +475,8 @@ export function usePalette() {
     setCanPick(false);
     setImage(null);
     setTree(null);
+    setPool(null);
+    poolKeyRef.current = null;
     setPinned([]);
     setExcluded(new Set());
     setError(null);
@@ -401,7 +499,11 @@ export function usePalette() {
     /** how many refuse to be removed or slid away */
     locked: swatches.filter((s) => s.locked).length,
     /** how many distinct colours this image can yield, <= MAX_COLOURS */
-    available: tree ? maxAvailable(tree) : 0,
+    available: sequence ? sequence.length : tree ? maxAvailable(tree) : 0,
+    /** true while the picker settings are steering which colours are chosen */
+    shaped,
+    /** true while a settings change is still being worked out in the worker */
+    pooling: Boolean(tree && shaped && pool?.key !== key),
     canPick,
     derive,
     openFile,

@@ -3,22 +3,33 @@
 /**
  * Runs the quantiser off the main thread, so a large image never freezes the UI.
  *
- * This runs *once per image*, all the way to MAX_COLOURS, and posts back the
- * whole split tree. Changing the colour count afterwards is main-thread work
+ * One worker lives for as long as its image does. `load` samples the image
+ * once, keeps the OKLab pixels, and posts back the whole split tree to
+ * MAX_COLOURS; changing the colour count afterwards is main-thread work
  * against that tree — see `deriveAtCount`.
+ *
+ * `pool` re-quantises just the pixels a set of picker filters lets through,
+ * reusing the kept pixels so the image is never decoded twice.
  */
 
 import { rgbToOklab } from '../lib/colour';
-import { MAX_COLOURS, quantise, type PaletteTree } from '../lib/quantise';
+import type { PixelFilter } from '../lib/pickerSettings';
+import { MAX_COLOURS, quantise, type PaletteTree, type QuantiseInput } from '../lib/quantise';
+import { filterPixels, POOL_SIZE } from '../lib/select';
 
 /** Longest side of the sampled image. ~65k pixels is plenty for a palette. */
 const SAMPLE_SIZE = 256;
 
-export type WorkerRequest = { bitmap: ImageBitmap };
+export type WorkerRequest =
+  | { type: 'load'; bitmap: ImageBitmap }
+  | { type: 'pool'; key: string; filter: PixelFilter };
 
 export type WorkerResponse =
-  | { ok: true; tree: PaletteTree }
-  | { ok: false; error: string };
+  | { type: 'tree'; ok: true; tree: PaletteTree }
+  | { type: 'tree'; ok: false; error: string }
+  | { type: 'pool'; key: string; tree: PaletteTree };
+
+let pixels: QuantiseInput | null = null;
 
 function buildInput(data: ImageData) {
   const { data: px, width, height } = data;
@@ -51,9 +62,7 @@ function buildInput(data: ImageData) {
   };
 }
 
-self.onmessage = (event: MessageEvent<WorkerRequest>) => {
-  const { bitmap } = event.data;
-
+function load(bitmap: ImageBitmap) {
   try {
     const scale = Math.min(1, SAMPLE_SIZE / Math.max(bitmap.width, bitmap.height));
     const width = Math.max(1, Math.round(bitmap.width * scale));
@@ -64,12 +73,16 @@ self.onmessage = (event: MessageEvent<WorkerRequest>) => {
     if (!ctx) throw new Error('Could not get a 2D context in the worker.');
 
     ctx.drawImage(bitmap, 0, 0, width, height);
-    const tree = quantise(buildInput(ctx.getImageData(0, 0, width, height)), MAX_COLOURS);
+    pixels = buildInput(ctx.getImageData(0, 0, width, height));
+    // quantise sorts its own index array, never the pixels, so the kept copy
+    // stays good for every pool request after this.
+    const tree = quantise(pixels, MAX_COLOURS);
 
-    const response: WorkerResponse = { ok: true, tree };
+    const response: WorkerResponse = { type: 'tree', ok: true, tree };
     self.postMessage(response);
   } catch (error) {
     const response: WorkerResponse = {
+      type: 'tree',
       ok: false,
       error: error instanceof Error ? error.message : 'Could not read that image.',
     };
@@ -77,4 +90,18 @@ self.onmessage = (event: MessageEvent<WorkerRequest>) => {
   } finally {
     bitmap.close();
   }
+}
+
+self.onmessage = (event: MessageEvent<WorkerRequest>) => {
+  const request = event.data;
+
+  if (request.type === 'load') {
+    load(request.bitmap);
+    return;
+  }
+
+  if (!pixels) return;
+  const tree = quantise(filterPixels(pixels, request.filter), POOL_SIZE);
+  const response: WorkerResponse = { type: 'pool', key: request.key, tree };
+  self.postMessage(response);
 };
