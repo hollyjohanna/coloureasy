@@ -28,7 +28,7 @@ import { oklabToRgb, rgbToOklab, type Rgb } from './colour';
 
 export const DEFAULT_VALUES = 4;
 export const MIN_VALUES = 2;
-export const MAX_VALUES = 9;
+export const MAX_VALUES = 10;
 
 /** Enough samples to describe a tonal distribution without scanning millions. */
 const TARGET_SAMPLES = 60_000;

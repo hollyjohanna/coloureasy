@@ -57,22 +57,39 @@ export default function ValuePanel({
     <aside className="flex w-full shrink-0 flex-col border-line bg-shell lg:w-[380px] lg:border-l">
       <div className="space-y-3 border-b border-line px-5 py-4">
         <div>
-          <div className="flex items-baseline justify-between">
-            <label htmlFor="steps" className="text-sm font-medium">
-              Values
-            </label>
-            <span className="font-mono text-sm tabular-nums text-muted">{steps}</span>
-          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium">Values</span>
 
-          <input
-            id="steps"
-            type="range"
-            min={MIN_VALUES}
-            max={MAX_VALUES}
-            value={steps}
-            onChange={(e) => onSteps(Number(e.target.value))}
-            className="mt-3 w-full"
-          />
+            <div className="flex items-center gap-1 rounded-lg border border-line p-0.5">
+              <button
+                type="button"
+                onClick={() => onSteps(steps - 1)}
+                disabled={steps <= MIN_VALUES}
+                aria-label="One value fewer"
+                className="grid h-7 w-7 place-items-center rounded-md text-base text-muted transition-colors hover:bg-raised hover:text-ink disabled:opacity-30 disabled:hover:bg-transparent"
+              >
+                −
+              </button>
+
+              <output
+                id="steps"
+                aria-live="polite"
+                className="w-6 text-center font-mono text-sm tabular-nums"
+              >
+                {steps}
+              </output>
+
+              <button
+                type="button"
+                onClick={() => onSteps(steps + 1)}
+                disabled={steps >= MAX_VALUES}
+                aria-label="One value more"
+                className="grid h-7 w-7 place-items-center rounded-md text-base text-muted transition-colors hover:bg-raised hover:text-ink disabled:opacity-30 disabled:hover:bg-transparent"
+              >
+                +
+              </button>
+            </div>
+          </div>
 
           <p className="mt-2 text-xs text-faint">
             Three or four is the classic study. Check the structure reads before
