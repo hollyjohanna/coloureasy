@@ -309,9 +309,9 @@ export default function PalettePicker({
                 event.preventDefault();
                 onReorder(i, back ? i - 1 : i + 1);
               }}
-              className={`group flex flex-1 touch-none items-center justify-between px-4 py-3 text-left transition-[flex,transform] select-none sm:flex-col sm:items-center sm:justify-end sm:py-6 ${
+              className={`group flex flex-1 touch-none flex-col items-center justify-center gap-1 px-4 py-3 text-center transition-[flex,transform] duration-200 ease-out select-none ${
                 carrying === i
-                  ? 'z-10 scale-[1.04] cursor-grabbing shadow-2xl'
+                  ? 'z-10 scale-[1.04] cursor-grabbing shadow-2xl duration-75'
                   : 'cursor-grab'
               }`}
               style={{ background: formats.hex, color: ink }}
@@ -319,7 +319,7 @@ export default function PalettePicker({
               <span className="font-mono text-sm font-semibold tracking-wide">
                 {formats.hex}
               </span>
-              <span className="text-[11px] opacity-0 transition-opacity group-hover:opacity-70 sm:mt-1">
+              <span className="text-[11px] opacity-0 transition-opacity group-hover:opacity-70">
                 {pick.custom ? 'moved' : 'drag to reorder'}
               </span>
             </button>
