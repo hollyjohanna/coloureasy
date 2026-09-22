@@ -25,18 +25,18 @@ const TOOLS: {
     icon: '▦',
   },
   {
-    id: 'picker',
-    label: 'Colour Picker',
-    short: 'Picker',
-    hint: 'Every colour, with codes',
-    icon: '◎',
-  },
-  {
     id: 'values',
     label: 'Value Study',
     short: 'Values',
     hint: 'Tone alone, colour removed',
     icon: '◐',
+  },
+  {
+    id: 'picker',
+    label: 'Colour Picker',
+    short: 'Picker',
+    hint: 'Every colour, with codes',
+    icon: '◎',
   },
   {
     id: 'layers',
