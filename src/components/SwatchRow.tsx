@@ -79,14 +79,14 @@ export default function SwatchRow({
               ? 'Locked — the slider and remove leave this one alone'
               : 'Lock this colour'
           }
-          className={`pointer-events-auto grid h-6 w-6 place-items-center rounded text-[11px] transition-opacity ${
+          className={`pointer-events-auto grid h-6 w-6 place-items-center rounded transition-opacity ${
             swatch.locked
               ? 'opacity-90'
               : 'opacity-0 group-hover/row:opacity-70 focus-visible:opacity-100'
           }`}
           style={{ color: ink }}
         >
-          {swatch.locked ? '🔒' : '🔓'}
+          <LockIcon locked={swatch.locked} />
         </button>
 
         <button
@@ -125,5 +125,30 @@ export default function SwatchRow({
         </dl>
       )}
     </li>
+  );
+}
+
+/** A single-colour padlock that matches the app's other line icons, rather
+    than an emoji whose own colours fight whatever swatch it sits on. */
+function LockIcon({ locked }: { locked?: boolean }) {
+  return (
+    <svg
+      aria-hidden
+      width="13"
+      height="13"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2.25}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <rect x="4" y="11" width="16" height="10" rx="2" />
+      {locked ? (
+        <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+      ) : (
+        <path d="M8 11V7a4 4 0 0 1 7.1-2.5" />
+      )}
+    </svg>
   );
 }
