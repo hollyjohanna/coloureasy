@@ -97,31 +97,6 @@ export async function exportLayerZip(
     ),
   });
 
-  entries.push({
-    name: 'README.txt',
-    data: new TextEncoder().encode(
-      mode === 'isolated'
-        ? [
-            'Isolated layers.',
-            '',
-            'Each PNG holds one colour and is transparent everywhere else.',
-            'No two layers overlap, so stacking all of them in any order',
-            'reproduces flattened.png exactly.',
-            '',
-            'Layers are numbered by coverage, largest area first.',
-          ].join('\n')
-        : [
-            'Cumulative layers.',
-            '',
-            'Each PNG holds its own colour plus every colour beneath it, so',
-            'each one is a complete coat painted over the last.',
-            '',
-            'Stack them in numerical order — 01 first, then 02 over it, and',
-            'so on. The final layer is identical to flattened.png.',
-          ].join('\n'),
-    ),
-  });
-
   onProgress?.(used.length + 1, used.length + 1);
   download(zip(entries), `${baseName(imageName, 'layers')}.zip`);
 }
