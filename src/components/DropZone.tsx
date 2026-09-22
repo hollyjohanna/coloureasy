@@ -52,7 +52,7 @@ export default function DropZone({ onFile, onUrl, busy }: Props) {
         }`}
       >
         <p className="text-lg font-medium">Drop an image here</p>
-        <p className="mt-2 text-sm text-muted">
+        <p className="font-body mt-2 text-sm text-muted">
           or paste one from your clipboard
         </p>
 
@@ -103,7 +103,7 @@ export default function DropZone({ onFile, onUrl, busy }: Props) {
         </button>
       </form>
 
-      <p className="text-center text-xs text-faint">
+      <p className="font-body text-center text-xs text-faint">
         Images are read entirely in your browser. Nothing is uploaded or stored.
       </p>
     </div>

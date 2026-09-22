@@ -74,7 +74,7 @@ export default function Library({
   if (!available) {
     return (
       <div className="grid flex-1 place-items-center p-8 text-center">
-        <p className="max-w-sm text-sm text-muted">
+        <p className="font-body max-w-sm text-sm text-muted">
           This browser doesn’t allow local storage, so the library is
           unavailable. Everything else works as normal.
         </p>
@@ -118,7 +118,7 @@ export default function Library({
         </button>
 
         {space && (
-          <p className="mt-3 hidden text-[11px] leading-relaxed text-faint lg:block">
+          <p className="font-body mt-3 hidden text-[11px] leading-relaxed text-faint lg:block">
             {formatSize(space.used)} used. Stored in this browser only — it
             won’t follow you to another device.
           </p>
@@ -127,11 +127,11 @@ export default function Library({
 
       <div className="min-w-0 flex-1 overflow-y-auto p-4 sm:p-6">
         {!ready ? (
-          <p className="text-sm text-faint">Opening the library…</p>
+          <p className="font-body text-sm text-faint">Opening the library…</p>
         ) : shown.length === 0 ? (
           <div className="grid h-full place-items-center py-16 text-center">
             <div>
-              <p className="text-sm text-muted">
+              <p className="font-body text-sm text-muted">
                 {active === RECENT
                   ? 'Nothing here yet. Images you open are kept automatically.'
                   : 'This collection is empty. Open Recent and file something into it.'}

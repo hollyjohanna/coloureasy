@@ -86,7 +86,7 @@ export default function PalettePanel({
           className="mt-3 w-full"
         />
 
-        <p className="mt-2 text-xs text-faint">
+        <p className="font-body mt-2 text-xs text-faint">
           {capped
             ? shaped
               ? available === 0
@@ -161,7 +161,7 @@ export default function PalettePanel({
           </ExportButton>
         </div>
 
-        <p className="text-[11px] leading-relaxed text-faint">
+        <p className="font-body text-[11px] leading-relaxed text-faint">
           The link carries the palette, not the image.
         </p>
       </div>

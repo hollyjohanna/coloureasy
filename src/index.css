@@ -43,7 +43,10 @@
   --color-muted: var(--muted);
   --color-faint: var(--faint);
 
-  --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  /* Raleway carries the interface — headings, labels, buttons. Lato is for
+     the prose around it: hints, descriptions, messages (`font-body`). */
+  --font-sans: 'Raleway Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-body: 'Lato', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
 }
 
@@ -58,6 +61,9 @@ body {
   background: var(--shell);
   color: var(--ink);
   font-family: var(--font-sans);
+  /* Raleway defaults to old-style figures, whose 3s, 4s and 9s drop below the
+     line — charming in prose, wobbly in a tool full of values and percentages. */
+  font-variant-numeric: lining-nums;
   -webkit-font-smoothing: antialiased;
 }
 

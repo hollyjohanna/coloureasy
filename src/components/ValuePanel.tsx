@@ -91,7 +91,7 @@ export default function ValuePanel({
             </div>
           </div>
 
-          <p className="mt-2 text-xs text-faint">
+          <p className="font-body mt-2 text-xs text-faint">
             Three or four is the classic study. Check the structure reads before
             you think about colour.
           </p>
@@ -269,7 +269,7 @@ export default function ValuePanel({
           </button>
         </div>
 
-        <p className="text-[11px] leading-relaxed text-faint">
+        <p className="font-body text-[11px] leading-relaxed text-faint">
           {mode === 'cumulative'
             ? 'Cumulative layers block in the way you would paint: darkest mass first, each coat over the last.'
             : 'One PNG per value, transparent elsewhere.'}

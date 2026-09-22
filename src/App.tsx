@@ -226,7 +226,7 @@ export default function App() {
         <div className="min-w-0">
           <h1 className="text-sm font-semibold tracking-tight">Colour Easy</h1>
           {palette.image && (
-            <p className="truncate text-xs text-faint">{palette.image.name}</p>
+            <p className="font-body truncate text-xs text-faint">{palette.image.name}</p>
           )}
         </div>
 
@@ -520,7 +520,7 @@ export default function App() {
           otherwise a silent action. */}
       <div
         aria-live="polite"
-        className={`fixed bottom-5 left-1/2 max-w-[90vw] -translate-x-1/2 rounded-lg border border-line bg-raised px-4 py-2.5 font-mono text-xs shadow-xl transition-opacity ${
+        className={`fixed bottom-5 left-1/2 max-w-[90vw] -translate-x-1/2 rounded-lg border border-line bg-raised px-4 py-2.5 font-body text-xs shadow-xl transition-opacity ${
           toast ? 'opacity-100' : 'pointer-events-none opacity-0'
         }`}
       >

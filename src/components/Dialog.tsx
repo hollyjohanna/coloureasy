@@ -112,7 +112,7 @@ export function ConfirmDialog({
   return (
     <Overlay onCancel={onCancel}>
       <h2 className="text-sm font-semibold">{title}</h2>
-      <p className="mt-2 text-xs leading-relaxed text-muted">{message}</p>
+      <p className="font-body mt-2 text-xs leading-relaxed text-muted">{message}</p>
       <div className="mt-4 flex justify-end gap-2">
         <button
           type="button"

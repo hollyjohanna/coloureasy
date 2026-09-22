@@ -90,7 +90,7 @@ export default function Sidebar({ tool, onChange, hasImage }: Props) {
               <span className="hidden truncate text-sm font-medium lg:block">
                 {item.label}
               </span>
-              <span className="hidden truncate text-xs text-faint lg:block">
+              <span className="font-body hidden truncate text-xs text-faint lg:block">
                 {item.hint}
               </span>
             </span>

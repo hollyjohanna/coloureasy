@@ -266,7 +266,7 @@ export function FineTune({ settings, onChange, picking, onPicking }: FineTunePro
             )}
           </div>
           {picking && (
-            <p className="mt-1.5 text-xs text-faint">
+            <p className="font-body mt-1.5 text-xs text-faint">
               Click a colour in the image. Esc to cancel.
             </p>
           )}
@@ -339,7 +339,7 @@ export function FineTune({ settings, onChange, picking, onPicking }: FineTunePro
           onChange={(harmony) => onChange({ harmony: harmony as Harmony })}
         />
         {settings.harmony !== 'none' && (
-          <p className="-mt-2 text-xs text-faint">
+          <p className="font-body -mt-2 text-xs text-faint">
             Built around {settings.focusHue === null ? "the image's main hue" : 'the colour family'}.
           </p>
         )}
@@ -452,7 +452,7 @@ function Field({
 
 function Ends({ left, right }: { left: string; right: string }) {
   return (
-    <div className="mt-1 flex justify-between text-[11px] text-faint">
+    <div className="mt-1 flex justify-between font-body text-[11px] text-faint">
       <span>{left}</span>
       <span>{right}</span>
     </div>

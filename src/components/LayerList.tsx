@@ -81,7 +81,7 @@ export default function LayerList({
             ))}
           </div>
 
-          <p className="mt-2 text-xs text-faint">
+          <p className="font-body mt-2 text-xs text-faint">
             How much fine detail to keep. Bolder gives larger, flatter areas.
           </p>
         </div>
@@ -218,7 +218,7 @@ export default function LayerList({
           </button>
         </div>
 
-        <p className="text-[11px] leading-relaxed text-faint">
+        <p className="font-body text-[11px] leading-relaxed text-faint">
           {mode === 'isolated'
             ? 'One PNG per colour, transparent elsewhere. Stack them in any order to rebuild the image.'
             : 'Each PNG is a full coat over the last. Stack them in order, 01 first.'}

@@ -45,7 +45,7 @@ export default function Landing({
         <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
           Plan a painting from a photograph
         </h1>
-        <p className="mx-auto mt-4 max-w-lg text-sm leading-relaxed text-muted sm:text-base">
+        <p className="font-body mx-auto mt-4 max-w-lg text-sm leading-relaxed text-muted sm:text-base">
           Colour Easy pulls a palette out of any image, shows you its tonal
           structure, and rebuilds the picture using only the colours you choose —
           so you know what to mix before you pick up a brush.
@@ -112,13 +112,13 @@ export default function Landing({
           {TOOLS.map(([name, blurb]) => (
             <li key={name}>
               <h3 className="text-sm font-medium">{name}</h3>
-              <p className="mt-0.5 text-xs leading-relaxed text-faint">{blurb}</p>
+              <p className="font-body mt-0.5 text-xs leading-relaxed text-faint">{blurb}</p>
             </li>
           ))}
         </ul>
       </section>
 
-      <p className="mt-12 max-w-md text-center text-xs leading-relaxed text-faint">
+      <p className="font-body mt-12 max-w-md text-center text-xs leading-relaxed text-faint">
         Everything happens in your browser. Your images are never uploaded, and
         the library is stored on this device only.
       </p>
