@@ -1,6 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { rgbToHex } from '../lib/colour';
+import { ConfirmDialog, PromptDialog } from './Dialog';
 import type { Collection, ImageRecord } from '../lib/library';
+
+type DialogState =
+  | { type: 'newCollection' }
+  | { type: 'renamePhoto'; id: string; name: string }
+  | { type: 'renameCollection'; id: string; name: string }
+  | { type: 'deleteCollection'; id: string; name: string };
 
 type Props = {
   images: ImageRecord[];
@@ -10,6 +17,7 @@ type Props = {
   available: boolean;
   onOpen: (record: ImageRecord) => void;
   onRemove: (id: string) => void;
+  onRename: (id: string, name: string) => void;
   onAddCollection: (name: string) => void;
   onRenameCollection: (id: string, name: string) => void;
   onDropCollection: (id: string) => void;
@@ -33,6 +41,7 @@ export default function Library({
   available,
   onOpen,
   onRemove,
+  onRename,
   onAddCollection,
   onRenameCollection,
   onDropCollection,
@@ -42,6 +51,7 @@ export default function Library({
 }: Props) {
   const [active, setActive] = useState<string>(RECENT);
   const [filing, setFiling] = useState<string | null>(null);
+  const [dialog, setDialog] = useState<DialogState | null>(null);
 
   // A collection can be deleted while it's the one being viewed.
   useEffect(() => {
@@ -88,18 +98,19 @@ export default function Library({
               count={collection.imageIds.length}
               active={active === collection.id}
               onSelect={() => setActive(collection.id)}
-              onRename={(name) => onRenameCollection(collection.id, name)}
-              onDelete={() => onDropCollection(collection.id)}
+              onRename={() =>
+                setDialog({ type: 'renameCollection', id: collection.id, name: collection.name })
+              }
+              onDelete={() =>
+                setDialog({ type: 'deleteCollection', id: collection.id, name: collection.name })
+              }
             />
           ))}
         </div>
 
         <button
           type="button"
-          onClick={() => {
-            const name = window.prompt('Name this collection');
-            if (name?.trim()) onAddCollection(name);
-          }}
+          onClick={() => setDialog({ type: 'newCollection' })}
           className="mt-2 w-full rounded-lg border border-dashed border-line px-3 py-2 text-xs text-muted transition-colors hover:bg-surface hover:text-ink"
         >
           + New collection
@@ -175,6 +186,18 @@ export default function Library({
                     {image.name}
                   </span>
 
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setDialog({ type: 'renamePhoto', id: image.id, name: image.name })
+                    }
+                    aria-label={`Rename ${image.name}`}
+                    title="Rename"
+                    className="shrink-0 rounded px-1.5 py-0.5 text-xs text-faint transition-colors hover:bg-raised hover:text-ink"
+                  >
+                    ✎
+                  </button>
+
                   {collections.length > 0 && (
                     <button
                       type="button"
@@ -222,6 +245,54 @@ export default function Library({
           </ul>
         )}
       </div>
+
+      {dialog?.type === 'newCollection' && (
+        <PromptDialog
+          title="Name this collection"
+          confirmLabel="Create"
+          onConfirm={(name) => {
+            onAddCollection(name);
+            setDialog(null);
+          }}
+          onCancel={() => setDialog(null)}
+        />
+      )}
+
+      {dialog?.type === 'renamePhoto' && (
+        <PromptDialog
+          title="Rename this photo"
+          defaultValue={dialog.name}
+          onConfirm={(name) => {
+            onRename(dialog.id, name);
+            setDialog(null);
+          }}
+          onCancel={() => setDialog(null)}
+        />
+      )}
+
+      {dialog?.type === 'renameCollection' && (
+        <PromptDialog
+          title="Rename this collection"
+          defaultValue={dialog.name}
+          onConfirm={(name) => {
+            onRenameCollection(dialog.id, name);
+            setDialog(null);
+          }}
+          onCancel={() => setDialog(null)}
+        />
+      )}
+
+      {dialog?.type === 'deleteCollection' && (
+        <ConfirmDialog
+          title={`Delete “${dialog.name}”?`}
+          message="The images stay in Recent — only the collection goes."
+          onConfirm={() => {
+            onDropCollection(dialog.id);
+            setDialog(null);
+          }}
+          onCancel={() => setDialog(null)}
+        />
+      )}
     </div>
   );
 }
@@ -238,7 +309,7 @@ function CollectionTab({
   count: number;
   active: boolean;
   onSelect: () => void;
-  onRename?: (name: string) => void;
+  onRename?: () => void;
   onDelete?: () => void;
 }) {
   return (
@@ -263,10 +334,7 @@ function CollectionTab({
         <span className="flex shrink-0 pr-1.5">
           <button
             type="button"
-            onClick={() => {
-              const name = window.prompt('Rename this collection', label);
-              if (name?.trim()) onRename(name);
-            }}
+            onClick={onRename}
             aria-label={`Rename ${label}`}
             className="rounded px-1 text-[11px] text-faint hover:text-ink"
           >
@@ -274,11 +342,7 @@ function CollectionTab({
           </button>
           <button
             type="button"
-            onClick={() => {
-              if (window.confirm(`Delete the collection “${label}”? The images stay in Recent.`)) {
-                onDelete();
-              }
-            }}
+            onClick={onDelete}
             aria-label={`Delete ${label}`}
             className="rounded px-1 text-[11px] text-faint hover:text-ink"
           >

@@ -276,6 +276,7 @@ export default function App() {
               available={library.available}
               onOpen={openFromLibrary}
               onRemove={library.remove}
+              onRename={library.renameImage}
               onAddCollection={library.addCollection}
               onRenameCollection={library.renameCollection}
               onDropCollection={library.dropCollection}

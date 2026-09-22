@@ -119,6 +119,16 @@ export function useLibrary() {
     [refresh],
   );
 
+  const renameImage = useCallback(
+    async (id: string, name: string) => {
+      const existing = images.find((i) => i.id === id);
+      if (!existing) return;
+      await putImage({ ...existing, name: name.trim() || existing.name });
+      await refresh();
+    },
+    [images, refresh],
+  );
+
   const addCollection = useCallback(
     async (name: string) => {
       const collection = await create(name);
@@ -174,6 +184,7 @@ export function useLibrary() {
     describe,
     open,
     remove,
+    renameImage,
     addCollection,
     renameCollection,
     dropCollection,
