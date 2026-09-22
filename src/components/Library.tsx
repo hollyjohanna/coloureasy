@@ -7,7 +7,8 @@ type DialogState =
   | { type: 'newCollection' }
   | { type: 'renamePhoto'; id: string; name: string }
   | { type: 'renameCollection'; id: string; name: string }
-  | { type: 'deleteCollection'; id: string; name: string };
+  | { type: 'deleteCollection'; id: string; name: string }
+  | { type: 'removeImage'; id: string; name: string };
 
 type Props = {
   images: ImageRecord[];
@@ -147,7 +148,7 @@ export default function Library({
             </div>
           </div>
         ) : (
-          <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
+          <ul className="grid grid-cols-2 items-start gap-3 sm:grid-cols-3 xl:grid-cols-4">
             {shown.map((image) => (
               <li
                 key={image.id}
@@ -181,8 +182,8 @@ export default function Library({
                   )}
                 </button>
 
-                <div className="flex items-center gap-1 px-2.5 py-2">
-                  <span className="min-w-0 flex-1 truncate text-[11px] text-muted">
+                <div className="flex items-center gap-0.5 px-2 py-1.5">
+                  <span className="min-w-0 flex-1 truncate px-0.5 text-[11px] text-muted">
                     {image.name}
                   </span>
 
@@ -193,7 +194,7 @@ export default function Library({
                     }
                     aria-label={`Rename ${image.name}`}
                     title="Rename"
-                    className="shrink-0 rounded px-1.5 py-0.5 text-xs text-faint transition-colors hover:bg-raised hover:text-ink"
+                    className="grid h-8 w-8 shrink-0 place-items-center rounded-md text-sm text-faint transition-colors hover:bg-raised hover:text-ink"
                   >
                     ✎
                   </button>
@@ -202,9 +203,12 @@ export default function Library({
                     <button
                       type="button"
                       onClick={() => setFiling(filing === image.id ? null : image.id)}
+                      aria-pressed={filing === image.id}
                       aria-label="Add to a collection"
                       title="Add to a collection"
-                      className="shrink-0 rounded px-1.5 py-0.5 text-xs text-faint transition-colors hover:bg-raised hover:text-ink"
+                      className={`grid h-8 w-8 shrink-0 place-items-center rounded-md text-sm transition-colors hover:bg-raised hover:text-ink ${
+                        filing === image.id ? 'bg-raised text-ink' : 'text-faint'
+                      }`}
                     >
                       ⊞
                     </button>
@@ -212,17 +216,17 @@ export default function Library({
 
                   <button
                     type="button"
-                    onClick={() => onRemove(image.id)}
+                    onClick={() => setDialog({ type: 'removeImage', id: image.id, name: image.name })}
                     aria-label={`Remove ${image.name} from the library`}
                     title="Remove from the library"
-                    className="shrink-0 rounded px-1.5 py-0.5 text-xs text-faint transition-colors hover:bg-raised hover:text-ink"
+                    className="grid h-8 w-8 shrink-0 place-items-center rounded-md text-base text-faint transition-colors hover:bg-raised hover:text-ink"
                   >
                     ×
                   </button>
                 </div>
 
                 {filing === image.id && (
-                  <ul className="border-t border-line px-2 py-1.5">
+                  <ul className="space-y-0.5 border-t border-line p-2">
                     {collections.map((collection) => {
                       const has = collection.imageIds.includes(image.id);
                       return (
@@ -230,9 +234,32 @@ export default function Library({
                           <button
                             type="button"
                             onClick={() => onToggleIn(collection.id, image.id)}
-                            className="flex w-full items-center gap-2 rounded px-1.5 py-1 text-left text-[11px] text-muted transition-colors hover:bg-raised hover:text-ink"
+                            aria-pressed={has}
+                            className="flex w-full items-center gap-2 rounded-md px-1.5 py-1.5 text-left text-[11px] text-muted transition-colors hover:bg-raised hover:text-ink"
                           >
-                            <span aria-hidden>{has ? '☑' : '☐'}</span>
+                            <span
+                              aria-hidden
+                              className={`grid h-4 w-4 shrink-0 place-items-center rounded border transition-colors ${
+                                has
+                                  ? 'border-ink bg-ink text-shell'
+                                  : 'border-line bg-transparent'
+                              }`}
+                            >
+                              {has && (
+                                <svg
+                                  width="10"
+                                  height="10"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth={3}
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                >
+                                  <path d="M20 6 9 17l-5-5" />
+                                </svg>
+                              )}
+                            </span>
                             <span className="truncate">{collection.name}</span>
                           </button>
                         </li>
@@ -293,6 +320,18 @@ export default function Library({
           onCancel={() => setDialog(null)}
         />
       )}
+
+      {dialog?.type === 'removeImage' && (
+        <ConfirmDialog
+          title={`Remove “${dialog.name}”?`}
+          message="It comes out of the library and every collection it's in. This can't be undone."
+          onConfirm={() => {
+            onRemove(dialog.id);
+            setDialog(null);
+          }}
+          onCancel={() => setDialog(null)}
+        />
+      )}
     </div>
   );
 }
@@ -314,7 +353,7 @@ function CollectionTab({
 }) {
   return (
     <div
-      className={`flex shrink-0 items-center gap-1 rounded-lg transition-colors lg:w-full ${
+      className={`group flex shrink-0 items-center gap-1 rounded-lg transition-colors lg:w-full ${
         active ? 'bg-raised' : 'hover:bg-surface'
       }`}
     >
@@ -330,13 +369,18 @@ function CollectionTab({
         <span className="ml-1.5 text-faint">{count}</span>
       </button>
 
-      {onRename && onDelete && active && (
-        <span className="flex shrink-0 pr-1.5">
+      {onRename && onDelete && (
+        <span
+          className={`flex shrink-0 gap-0.5 pr-1 transition-opacity ${
+            active ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100'
+          }`}
+        >
           <button
             type="button"
             onClick={onRename}
             aria-label={`Rename ${label}`}
-            className="rounded px-1 text-[11px] text-faint hover:text-ink"
+            title="Rename"
+            className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-sm text-faint transition-colors hover:bg-surface hover:text-ink"
           >
             ✎
           </button>
@@ -344,7 +388,8 @@ function CollectionTab({
             type="button"
             onClick={onDelete}
             aria-label={`Delete ${label}`}
-            className="rounded px-1 text-[11px] text-faint hover:text-ink"
+            title="Delete this collection"
+            className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-base text-faint transition-colors hover:bg-surface hover:text-ink"
           >
             ×
           </button>
